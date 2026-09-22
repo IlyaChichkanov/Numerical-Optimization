@@ -399,6 +399,157 @@ def fig_sensitivity():
     save("09_sensitivity.png")
 
 
+# ---------------------------------------------------------------- 10 неделимый завод: конечный зазор двойственности
+def fig_indivisible_gap():
+    # завод: линия либо стоит (x=0, расходы 0), либо работает на полную (x=4, расходы 10);
+    # контракт x >= 3 -> p* = 10; ставка mu: стоять и платить 3mu, или работать за 10 - mu
+    mu = np.linspace(0, 5, 501)
+    stand, work = 3 * mu, 10 - mu
+    d = np.minimum(stand, work)
+    i = np.argmax(d)
+    assert abs(mu[i] - 2.5) < 1e-9 and abs(d[i] - 7.5) < 1e-9
+    pstar = 10.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.2), gridspec_kw=dict(width_ratios=[1, 1.25]))
+    ax = axes[0]
+    ax.grid(False)
+    ax.axvspan(-0.8, 3, color=RED, alpha=0.07, lw=0)
+    ax.axvline(3, color=INK, lw=1.4)
+    ax.text(3.08, 13.6, "контракт: $x \\geq 3$", fontsize=9.5)
+    ax.plot([0, 4], [0, 10], "o", color=INK, ms=11, zorder=6)
+    ax.plot(4, 10, "*", color=INK, ms=20, zorder=7, mec="white", mew=0.6)
+    ax.text(0, 1.0, "линия стоит\n$x=0$, расходы $0$", ha="center", fontsize=9)
+    ax.text(4, 7.4, "линия на полную\n$x=4$, расходы $10$", ha="center", fontsize=9)
+    ax.annotate("единственная допустимая точка:\n$p^\\ast = 10$", xy=(4, 10), xytext=(0.2, 12.0),
+                arrowprops=dict(arrowstyle="->", color=INK, lw=1.1), fontsize=9.5)
+    ax.text(1.2, 4.6, "«между» ничего нет:\nдопустимое множество —\nдве точки, задача невыпукла",
+            fontsize=8.5, color=GRAY, ha="center")
+    ax.set(xlim=(-0.8, 5.2), ylim=(-1.5, 14.5), xlabel="выпуск $x$", ylabel="расходы $f(x)$",
+           title="неделимый завод: работать или нет")
+
+    ax = axes[1]
+    ax.plot(mu, stand, color=GRAY, lw=1.2, ls="--", label="стоять и платить штраф: $3\\mu$")
+    ax.plot(mu, work, color=GRAY, lw=1.2, ls=":", label="работать и получать премию: $10-\\mu$")
+    ax.plot(mu, d, color=AQUA, lw=2.6, label="$d(\\mu)=\\min(3\\mu,\\ 10-\\mu)$ — что платит завод")
+    ax.axhline(pstar, color=BLUE, lw=1.4, ls=":")
+    ax.text(0.1, pstar + 0.3, "$p^\\ast = 10$ (под запретом)", color=BLUE, fontsize=9.5)
+    ax.fill_between(mu, d, pstar, color=RED, alpha=0.08)
+    ax.plot(2.5, 7.5, "o", color=INK, ms=9, zorder=6)
+    ax.annotate("", xy=(2.5, pstar), xytext=(2.5, 7.5), arrowprops=dict(arrowstyle="<->", color=RED, lw=1.5))
+    ax.text(2.65, 8.6, "зазор $p^\\ast - d^\\ast = 2.5$", color=RED, fontsize=9.5)
+    ax.text(2.5, 6.6, "$\\mu^\\ast = 2.5,\\ d^\\ast = 7.5$", ha="center", fontsize=9.5)
+    ax.set(xlim=(0, 5), ylim=(-0.5, 12.5), xlabel="ставка штрафа $\\mu$", ylabel="расходы завода",
+           title="никакая ставка не воспроизводит запрет:\nзавод предпочитает платить или перевыполнять")
+    ax.legend(loc="lower right", fontsize=8)
+    save("10_indivisible_gap.png")
+
+
+# ---------------------------------------------------------------- 11 градиенты: множитель как сила стенки
+def fig_gradients():
+    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.7), gridspec_kw=dict(width_ratios=[1, 1.05, 1]))
+    arrow = lambda ax, p, v, col, lw=2.2: ax.annotate(
+        "", xy=(p[0] + v[0], p[1] + v[1]), xytext=p,
+        arrowprops=dict(arrowstyle="-|>", color=col, lw=lw, mutation_scale=16), zorder=8)
+
+    # --- (а) одномерный завод: тяга -f'(3) и реакция стенки mu*h'(3)
+    ax = axes[0]
+    ax.grid(False)
+    x = np.linspace(0.5, 5, 300)
+    ax.axvspan(0.5, 3, color=RED, alpha=0.07, lw=0)
+    ax.plot(x, (x - 2) ** 2, color=BLUE, lw=2.2)
+    ax.axvline(3, color=INK, lw=1.6)
+    ax.text(2.95, 6.9, "стенка $x=3$", ha="right", fontsize=9.5)
+    ax.plot(3, 1, "o", color=INK, ms=10, zorder=9)
+    arrow(ax, (3, 1), (-0.9, 0), RED)
+    arrow(ax, (3, 1), (0.9, 0), AQUA)
+    ax.text(1.75, 1.35, "тяга $-f'(3) = -2$\n(к вершине параболы)", ha="center", fontsize=8.5, color=RED)
+    ax.text(3.75, 1.5, "реакция стенки\n$\\mu\\, h'(3) = +2$", ha="center", fontsize=8.5, color=AQUA)
+    ax.text(1.0, 5.4, "равновесие:\n$f'(x^\\ast) = \\mu\\, h'(x^\\ast)$,\n$\\mu^\\ast = 2$", fontsize=9.5)
+    ax.set(xlim=(0.5, 5), ylim=(-0.6, 7.6), xlabel="$x$", ylabel="$f(x) = (x-2)^2$",
+           title="(а) стенка держит: множитель — сила реакции")
+
+    # --- (б) ящик: антиградиент наружу через активную грань; на неоптимальной точке — скольжение
+    Q = np.array([[2.0, 0.5], [0.5, 1.0]])
+    c = np.array([-3.0, -1.0])
+    df = lambda x: Q @ x + c
+    xstar = np.array([1.0, 0.5])
+    grad_h = np.array([-1.0, 0.0])                       # h_1 = 1 - x_1
+    mu = df(xstar)[0] / grad_h[0]
+    assert np.allclose(df(xstar), mu * grad_h) and abs(mu - 0.75) < 1e-12
+    xbad = np.array([1.0, -0.5])
+    gb = -df(xbad)                                       # (1.25, 1)
+    assert np.allclose(gb, [1.25, 1.0])
+
+    ax = axes[1]
+    ax.grid(False)
+    xs = np.linspace(-1.6, 2.2, 200)
+    X1, X2 = np.meshgrid(xs, xs)
+    F = 0.5 * (Q[0, 0] * X1 ** 2 + 2 * Q[0, 1] * X1 * X2 + Q[1, 1] * X2 ** 2) + c[0] * X1 + c[1] * X2
+    ax.contour(X1, X2, F, levels=16, colors=[GRAY], linewidths=0.6, alpha=0.8)
+    ax.add_patch(Rectangle((-1, -1), 2, 2, color=BLUE, alpha=0.10, lw=0))
+    ax.add_patch(Rectangle((-1, -1), 2, 2, fill=False, color=BLUE, lw=1.2, ls=":"))
+    ax.plot([1, 1], [-1, 1], color=RED, lw=2.4, zorder=5)
+    s = 0.55
+    ax.plot(*xstar, "o", color=INK, ms=9, zorder=9)
+    arrow(ax, xstar, s * (-df(xstar)), RED)              # тяга наружу
+    arrow(ax, xstar + np.array([0, 0.06]), s * mu * grad_h, AQUA)   # реакция внутрь (чуть выше, чтобы видеть обе)
+    ax.text(1.06, 0.72, "$x^\\ast$: тяга $-\\nabla f$ наружу,\nреакция $\\mu_1\\nabla h_1$ внутрь —\nгасятся, $\\mu_1 = 0.75$",
+            fontsize=8.3, color=INK)
+    ax.plot(*xbad, "s", color=VIOLET, ms=8, zorder=9)
+    arrow(ax, xbad, s * gb, VIOLET, lw=1.8)
+    arrow(ax, xbad, s * np.array([0, gb[1]]), ORANGE, lw=2.0)
+    ax.plot([1, 1 + s * gb[0]], [-0.5 + s * gb[1], -0.5 + s * gb[1]], color=VIOLET, lw=0.8, ls=":")
+    ax.plot([1 + s * gb[0], 1 + s * gb[0]], [-0.5, -0.5 + s * gb[1]], color=VIOLET, lw=0.8, ls=":")
+    ax.text(1.06, -0.98, "не оптимум: у $-\\nabla f$ есть\nсоставляющая вдоль стенки —\nскользим вверх", fontsize=8.3, color=VIOLET)
+    for (lx, ly, txt) in ((-1.06, 0.0, "$\\mu_2 = 0$"), (0.0, 1.06, "$\\mu_3 = 0$"), (0.0, -1.06, "$\\mu_4 = 0$")):
+        ax.text(lx, ly, txt, fontsize=8.5, color=GRAY, ha="center", va="center", rotation=90 if lx < 0 else 0)
+    ax.set(xlim=(-1.6, 2.4), ylim=(-1.6, 1.6), aspect="equal", xlabel="$x_1$", ylabel="$x_2$",
+           title="(б) ящик: $\\nabla f(x^\\ast) = \\mu_1 \\nabla h_1(x^\\ast)$")
+
+    # --- (в) вершина LP: градиент прибыли в конусе нормалей активных ограничений
+    A = np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 2.0]])
+    cc = np.array([3.0, 5.0])
+    y23 = np.linalg.solve(A[[1, 2]].T, cc)
+    assert np.allclose(y23, [1.5, 1.0])
+    V = np.array([[0, 0], [4, 0], [4, 3], [2, 6], [0, 6]], float)
+    v = np.array([2.0, 6.0])
+    a2, a3 = A[1], A[2]
+    k = 0.45                                             # масштаб векторов на картинке
+
+    ax = axes[2]
+    ax.grid(False)
+    ax.add_patch(Polygon(V, closed=True, facecolor=BLUE, alpha=0.10, edgecolor=BLUE, lw=1.2, ls=":"))
+    ax.plot(V[[2, 3], 0], V[[2, 3], 1], color=RED, lw=2.4, zorder=5)
+    ax.plot(V[[3, 4], 0], V[[3, 4], 1], color=RED, lw=2.4, zorder=5)
+    # конус внешних нормалей активных ограничений 2 и 3
+    e2, e3 = a2 / np.linalg.norm(a2), a3 / np.linalg.norm(a3)
+    R = 3.4
+    ang = np.linspace(np.arctan2(e3[1], e3[0]), np.arctan2(e2[1], e2[0]), 40)
+    cone = np.vstack([v, v + R * np.c_[np.cos(ang), np.sin(ang)]])
+    ax.add_patch(Polygon(cone, closed=True, facecolor=AQUA, alpha=0.18, edgecolor="none"))
+    arrow(ax, v, k * a2, AQUA, lw=1.8)
+    arrow(ax, v, k * a3, AQUA, lw=1.8)
+    ax.text(*(v + k * a2 + [-0.55, 0.05]), "$a_2$", color=AQUA, fontsize=10)
+    ax.text(*(v + k * a3 + [0.1, -0.15]), "$a_3$", color=AQUA, fontsize=10)
+    # разложение c = 1.5 a2 + 1 a3
+    p2, p3, pc = v + k * y23[0] * a2, v + k * y23[1] * a3, v + k * cc
+    arrow(ax, v, k * cc, RED, lw=2.4)
+    ax.plot([p2[0], pc[0]], [p2[1], pc[1]], color=INK, lw=0.9, ls="--")
+    ax.plot([p3[0], pc[0]], [p3[1], pc[1]], color=INK, lw=0.9, ls="--")
+    ax.plot(*p2, "o", color=INK, ms=4); ax.plot(*p3, "o", color=INK, ms=4)
+    ax.text(*(pc + [0.12, 0.05]), "$c = (3,5)$\nградиент прибыли", color=RED, fontsize=9.5)
+    ax.text(*(p2 + [-1.55, 0.0]), "$1.5\\,a_2$", fontsize=9.5)
+    ax.text(*(p3 + [0.12, -0.35]), "$1\\,a_3$", fontsize=9.5)
+    ax.plot(*v, "o", color=INK, ms=9, zorder=9)
+    ax.text(v[0] - 0.15, v[1] - 0.55, "$x^\\ast = (2,6)$", ha="right", fontsize=9.5)
+    ax.text(4.08, 1.4, "$x_1 \\leq 4$: не касается,\n$y_1^\\ast = 0$", fontsize=8.5, color=GRAY)
+    ax.text(0.2, 0.9, "$c = y_2^\\ast a_2 + y_3^\\ast a_3$,\n$y^\\ast = (0,\\ 1.5,\\ 1)$ — теневые цены", fontsize=9.5)
+    ax.set(xlim=(-0.4, 6.8), ylim=(-0.5, 9.6), aspect="equal", xlabel="$x_1$", ylabel="$x_2$",
+           title="(в) вершина LP: $c$ в конусе нормалей активных стенок")
+
+    save("11_gradients.png")
+
+
 if __name__ == "__main__":
     print("Сохраняю в", IMG)
     fig_recap_problems()
@@ -411,3 +562,5 @@ if __name__ == "__main__":
     fig_diet_shadow_prices()
     fig_qp_dual()
     fig_sensitivity()
+    fig_indivisible_gap()
+    fig_gradients()
