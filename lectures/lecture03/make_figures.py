@@ -3,8 +3,8 @@
 Запуск:  uv run python lectures/lecture03/make_figures.py
 
 Скрипт самодостаточен. Палитра и оформление — те же, что в лекциях 1-2.
-Числа во всех «настоящих» примерах (не помеченных как качественная схема)
-проверены отдельно в demo03.ipynb и exercises03.ipynb — здесь только рисунки.
+Числа во всех примерах считаются в самом скрипте и проверяются ассертами;
+те же числа воспроизводит demo03.ipynb.
 """
 
 from pathlib import Path
@@ -142,154 +142,6 @@ def fig_recap_problems():
     save("00_recap_problems.png")
 
 
-# ---------------------------------------------------------------- 01 слабая двойственность на пальцах
-def fig_weak_duality_line():
-    fig, ax = plt.subplots(figsize=(7.5, 2.2))
-    ax.set(xlim=(0, 10), ylim=(-1, 1), xticks=[], yticks=[])
-    for s in ax.spines.values():
-        s.set_visible(False)
-    ax.axhline(0, color=GRAY, lw=1.5)
-    ax.annotate("", xy=(9.7, 0), xytext=(9.3, 0), arrowprops=dict(arrowstyle="-|>", color=GRAY, lw=1.5))
-
-    duals = [1.2, 2.4, 3.5, 4.0]      # d(mu) для нескольких mu >= 0 -- растут к d*
-    primals = [7.6, 6.8, 6.1]         # f(x) для нескольких допустимых x -- убывают к p*
-    dstar, pstar = 4.0, 6.1
-
-    for u in duals:
-        ax.plot(u, 0, "o", color=AQUA, ms=9, zorder=5)
-    for t in primals:
-        ax.plot(t, 0, "o", color=BLUE, ms=9, zorder=5)
-    ax.plot(dstar, 0, "o", color=AQUA, ms=12, mec=INK, mew=1.3, zorder=6)
-    ax.plot(pstar, 0, "s", color=BLUE, ms=12, mec=INK, mew=1.3, zorder=6)
-
-    ax.annotate("", xy=(pstar, 0.32), xytext=(dstar, 0.32),
-                arrowprops=dict(arrowstyle="<->", color=RED, lw=1.6))
-    ax.text((dstar + pstar) / 2, 0.42, "зазор двойственности $p^\\ast - d^\\ast \\geq 0$",
-            ha="center", color=RED, fontsize=9.5)
-
-    ax.text(dstar, -0.32, "$d^\\ast = \\max_\\mu d(\\mu)$", ha="center", color=AQUA, fontsize=9.5)
-    ax.text(pstar, -0.32, "$p^\\ast = \\min f(x)$", ha="center", color=BLUE, fontsize=9.5)
-    ax.text(0.3, -0.75, "значения $d(\\mu)$ для допустимых $\\mu \\geq 0$", color=AQUA, fontsize=8.5)
-    ax.text(5.6, -0.75, "значения $f(x)$ для допустимых $x$", color=BLUE, fontsize=8.5)
-    ax.set(title="слабая двойственность: любой $d(\\mu)$ снизу, любой $f(x)$ сверху — между ними зазор")
-    save("01_weak_duality_line.png")
-
-
-# ---------------------------------------------------------------- 02 семейство функций Лагранжа (x-пространство)
-def fig_lagrangian_family():
-    x = np.linspace(0.5, 5.5, 400)
-    f = (x - 2) ** 2
-    mus = [0, 1, 2, 3]
-    colors = [GRAY, ORANGE, RED, VIOLET]
-
-    fig, ax = plt.subplots(figsize=(6.6, 4.6))
-    ax.axvspan(3, 5.6, color=BLUE, alpha=0.10, lw=0)
-    ax.plot(x, f, color=BLUE, lw=2.6, label="$f(x) = (x-2)^2$", zorder=5)
-    for mu, col in zip(mus, colors):
-        L = f - mu * (x - 3)
-        ax.plot(x, L, color=col, lw=1.6, ls="--",
-                label=f"$L(x,{mu}) = f(x) - {mu}(x-3)$" if mu else "$L(x,0) = f(x)$")
-        xs = 2 + mu / 2
-        ax.plot(xs, (xs - 2) ** 2 - mu * (xs - 3), "o", color=col, ms=6, zorder=6)
-    ax.axvline(3, color=INK, lw=1.2)
-    ax.text(3.05, 5.6, "$x \\geq 3$", fontsize=10)
-    ax.plot(3, 1, "o", color=INK, ms=10, zorder=7)
-    ax.annotate("$x^\\ast = 3,\\ f^\\ast = 1$", xy=(3, 1), xytext=(3.5, 2.4),
-                arrowprops=dict(arrowstyle="->", color=INK, lw=1.2), fontsize=10)
-    ax.set(xlim=(0.5, 5.5), ylim=(-1.5, 6.5), xlabel="$x$", ylabel="$f,\\ L$",
-           title="семейство $L(x,\\mu) = f(x) - \\mu\\,(x-3)$: точка минимума сдвигается с $\\mu$")
-    ax.legend(loc="upper left", fontsize=8.5)
-    save("02_lagrangian_family.png")
-
-
-# ---------------------------------------------------------------- 03 геометрия: множество G и опорные прямые
-def fig_geometric_duality():
-    u = np.linspace(-2.6, 2.6, 400)
-    t = (u + 1) ** 2                      # G = {(u, t) : u = x - 3, t = f(x)}, x = u + 3
-
-    fig, ax = plt.subplots(figsize=(6.8, 5.2))
-    ax.axvspan(0, 2.8, color=BLUE, alpha=0.08, lw=0, label="допустимо: $u \\geq 0$")
-    ax.plot(u, t, color=INK, lw=2.4, label=r"$G = \{(h(x),\,f(x)) : x \in \mathbb{R}\}$")
-
-    for mu, col in zip((0, 1, 2, 3), (GRAY, ORANGE, RED, VIOLET)):
-        # опорная прямая t = mu*u + d(mu), d(mu) = -mu^2/4 + mu
-        d = -mu ** 2 / 4 + mu
-        uu = np.linspace(-2.6, 2.6, 10)
-        ax.plot(uu, mu * uu + d, color=col, lw=1.4, ls="--",
-                label=f"$t = {mu} u + d({mu})$" if mu else "$t = d(0)$")
-        ax.plot(0, d, "o", color=col, ms=7, zorder=6)
-
-    ax.plot(0, 1, "*", color=INK, ms=18, zorder=7, mec="white", mew=0.6)
-    ax.annotate("$(0,\\,p^\\ast{=}1) = (0,\\,d^\\ast)$\nкасание при $\\mu^\\ast = 2$", xy=(0, 1),
-                xytext=(-2.5, 4.4), arrowprops=dict(arrowstyle="->", color=INK, lw=1.2), fontsize=9.5)
-    ax.set(xlim=(-2.6, 2.6), ylim=(-1.2, 6.5), xlabel="$u = h(x) = x - 3$", ylabel="$t = f(x)$",
-           title="опорные прямые $t = \\mu u + d(\\mu)$: $d(\\mu)$ — их пересечение с осью $u=0$")
-    ax.legend(loc="lower right", fontsize=8, ncol=1)
-    save("03_geometric_duality.png")
-
-
-# ---------------------------------------------------------------- 04 дуальная функция d(mu)
-def fig_dual_function():
-    mu = np.linspace(0, 4, 400)
-    d = -mu ** 2 / 4 + mu
-    pstar = 1.0
-
-    fig, ax = plt.subplots(figsize=(6.4, 4.2))
-    ax.axhline(pstar, color=BLUE, lw=1.4, ls=":")
-    ax.text(0.05, pstar + 0.12, "$p^\\ast = 1$", color=BLUE, fontsize=10)
-    ax.plot(mu, d, color=AQUA, lw=2.4, label="$d(\\mu) = -\\mu^2/4 + \\mu$")
-    ax.fill_between(mu, d, pstar, color=RED, alpha=0.08)
-    ax.plot(2, 1, "o", color=INK, ms=10, zorder=6)
-    ax.annotate("$\\mu^\\ast = 2,\\ d^\\ast = p^\\ast = 1$", xy=(2, 1), xytext=(2.15, 0.25),
-                arrowprops=dict(arrowstyle="->", color=INK, lw=1.2), fontsize=10)
-    ax.text(0.15, -1.05, "$d(\\mu)$ вогнута везде — даже когда исходная задача невыпукла", fontsize=9, color=INK)
-    ax.set(xlim=(0, 4), ylim=(-1.3, 1.6), xlabel="$\\mu$", ylabel="$d(\\mu)$",
-           title="двойственная функция: слабая двойственность как зазор, сильная — как касание")
-    ax.legend(loc="lower center", fontsize=9)
-    save("04_dual_function.png")
-
-
-# ---------------------------------------------------------------- 05 качественная схема: выпуклый и невыпуклый G
-def fig_nonconvex_gap():
-    fig, axes = plt.subplots(1, 2, figsize=(10.4, 4.8))
-
-    u = np.linspace(-2.7, 2.7, 500)
-    t_convex = 0.55 * u ** 2 + 0.15
-    ax = axes[0]
-    ax.axvspan(0, 2.9, color=BLUE, alpha=0.08, lw=0)
-    ax.plot(u, t_convex, color=INK, lw=2.4)
-    ax.plot(0, 0.15, "*", color=INK, ms=16, zorder=6, mec="white", mew=0.6)
-    uu = np.linspace(-2.7, 2.7, 6)
-    ax.plot(uu, 0.15 * np.ones_like(uu), color=RED, lw=1.6, ls="--")
-    ax.set(title="выпуклая задача: $G$ выпукло — опорная\nпрямая касается ровно в $p^\\ast$: $d^\\ast = p^\\ast$",
-           xlim=(-2.7, 2.7), ylim=(-1.1, 3.6), xlabel="$u = h(x)$", ylabel="$t = f(x)$")
-
-    # плавная невыпуклая кривая: две «ямы» разной глубины (левая — глобальный минимум по всем u,
-    # правая, при u >= 0, — то, что видно допустимой области); участок между ними выгибается вверх,
-    # так что кривая нигде не образует излома, но целиком невыпукла (вторая производная меняет знак)
-    t_noncvx = (0.16 * (u + 1.3) ** 2 * (u - 1.1) ** 2 + 0.10 * u + 0.55)
-    ax = axes[1]
-    ax.axvspan(0, 2.9, color=BLUE, alpha=0.08, lw=0)
-    ax.plot(u, t_noncvx, color=INK, lw=2.4)
-    imin = np.argmin(np.where(u >= 0, t_noncvx, np.inf))
-    ustar, tstar = u[imin], t_noncvx[imin]
-    ax.plot(ustar, tstar, "*", color=INK, ms=16, zorder=6, mec="white", mew=0.6)
-    # лучшая опорная прямая: касается кривой в её глобальном минимуме (u < 0, недопустимо),
-    # но лежит не выше кривой нигде — это и есть d*, и он строго ниже p* = t(u*)
-    iglob = np.argmin(t_noncvx)
-    dstar = t_noncvx[iglob]
-    ax.plot(uu, dstar * np.ones_like(uu), color=RED, lw=1.6, ls="--")
-    ax.plot(u[iglob], dstar, "o", color=RED, ms=7, zorder=6)
-    ax.annotate("", xy=(ustar, dstar), xytext=(ustar, tstar),
-                arrowprops=dict(arrowstyle="<->", color=RED, lw=1.6))
-    ax.text(ustar + 0.12, (dstar + tstar) / 2 - 0.05, "зазор\n$p^\\ast{-}d^\\ast{>}0$", color=RED, fontsize=9)
-    ax.set(title="невыпуклая задача: $G$ невыпукло — лучшая\nопорная прямая ниже $p^\\ast$: $d^\\ast < p^\\ast$",
-           xlim=(-2.7, 2.7), ylim=(-1.1, 3.6), xlabel="$u = h(x)$", ylabel="$t = f(x)$")
-    for a in axes:
-        a.grid(False)
-    save("05_nonconvex_gap.png")
-
-
 # ---------------------------------------------------------------- 06 LP: планирование производства + теневые цены
 def fig_lp_shadow_prices():
     P = np.array([[0, 0], [4, 0], [4, 3], [2, 6], [0, 6]])
@@ -316,22 +168,6 @@ def fig_lp_shadow_prices():
            title="двойственные переменные LP = теневые цены активных ограничений")
     ax.grid(False)
     save("06_lp_shadow_prices.png")
-
-
-# ---------------------------------------------------------------- 07 LP: диета, теневые цены веществ
-def fig_diet_shadow_prices():
-    labels = ["вещество 1\n($b_1=12$, активно)", "вещество 2\n($b_2=8$, активно)", "вещество 3\n($b_3=6$, слабо, $+0.4$)"]
-    y = np.array([1.2, 0.4, 0.0])
-    colors = [RED, RED, GRAY]
-
-    fig, ax = plt.subplots(figsize=(6.6, 4.0))
-    bars = ax.bar(labels, y, color=colors, width=0.55)
-    for b, v in zip(bars, y):
-        ax.text(b.get_x() + b.get_width() / 2, v + 0.03, f"{v:.1f}", ha="center", fontsize=10)
-    ax.set(ylabel="теневая цена $y_i^\\ast$ (руб. за единицу вещества)", ylim=(0, 1.5),
-           title="двойственные переменные диеты: цена, которую стоило бы\nзаплатить за дополнительную единицу вещества $i$")
-    ax.grid(axis="x")
-    save("07_diet_shadow_prices.png")
 
 
 # ---------------------------------------------------------------- 08 QP с ящиком: множители на границе
@@ -367,7 +203,7 @@ def fig_qp_dual():
     for b, v in zip(bars, mu):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", fontsize=10)
     ax.set(ylim=(0, 1.0), ylabel="$\\mu_i^\\ast$",
-           title="комплементарная нежёсткость:\n$\\mu_i^\\ast > 0$ только у активного ограничения")
+           title="множители: положителен только\nу активной грани, у остальных — ноль")
     ax.grid(axis="x")
     save("08_qp_dual.png")
 
@@ -397,51 +233,6 @@ def fig_sensitivity():
     ax.set(xlabel="$b_2$ (мощность второго цеха)", ylabel="$f^\\ast(b_2)$ (максимальная прибыль)",
            title="теневая цена — это наклон $f^\\ast(b)$:\nпроизводная оптимума по ограничению", ylim=(17, 49))
     save("09_sensitivity.png")
-
-
-# ---------------------------------------------------------------- 10 неделимый завод: конечный зазор двойственности
-def fig_indivisible_gap():
-    # завод: линия либо стоит (x=0, расходы 0), либо работает на полную (x=4, расходы 10);
-    # контракт x >= 3 -> p* = 10; ставка mu: стоять и платить 3mu, или работать за 10 - mu
-    mu = np.linspace(0, 5, 501)
-    stand, work = 3 * mu, 10 - mu
-    d = np.minimum(stand, work)
-    i = np.argmax(d)
-    assert abs(mu[i] - 2.5) < 1e-9 and abs(d[i] - 7.5) < 1e-9
-    pstar = 10.0
-
-    fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.2), gridspec_kw=dict(width_ratios=[1, 1.25]))
-    ax = axes[0]
-    ax.grid(False)
-    ax.axvspan(-0.8, 3, color=RED, alpha=0.07, lw=0)
-    ax.axvline(3, color=INK, lw=1.4)
-    ax.text(3.08, 13.6, "контракт: $x \\geq 3$", fontsize=9.5)
-    ax.plot([0, 4], [0, 10], "o", color=INK, ms=11, zorder=6)
-    ax.plot(4, 10, "*", color=INK, ms=20, zorder=7, mec="white", mew=0.6)
-    ax.text(0, 1.0, "линия стоит\n$x=0$, расходы $0$", ha="center", fontsize=9)
-    ax.text(4, 7.4, "линия на полную\n$x=4$, расходы $10$", ha="center", fontsize=9)
-    ax.annotate("единственная допустимая точка:\n$p^\\ast = 10$", xy=(4, 10), xytext=(0.2, 12.0),
-                arrowprops=dict(arrowstyle="->", color=INK, lw=1.1), fontsize=9.5)
-    ax.text(1.2, 4.6, "«между» ничего нет:\nдопустимое множество —\nдве точки, задача невыпукла",
-            fontsize=8.5, color=GRAY, ha="center")
-    ax.set(xlim=(-0.8, 5.2), ylim=(-1.5, 14.5), xlabel="выпуск $x$", ylabel="расходы $f(x)$",
-           title="неделимый завод: работать или нет")
-
-    ax = axes[1]
-    ax.plot(mu, stand, color=GRAY, lw=1.2, ls="--", label="стоять и платить штраф: $3\\mu$")
-    ax.plot(mu, work, color=GRAY, lw=1.2, ls=":", label="работать и получать премию: $10-\\mu$")
-    ax.plot(mu, d, color=AQUA, lw=2.6, label="$d(\\mu)=\\min(3\\mu,\\ 10-\\mu)$ — что платит завод")
-    ax.axhline(pstar, color=BLUE, lw=1.4, ls=":")
-    ax.text(0.1, pstar + 0.3, "$p^\\ast = 10$ (под запретом)", color=BLUE, fontsize=9.5)
-    ax.fill_between(mu, d, pstar, color=RED, alpha=0.08)
-    ax.plot(2.5, 7.5, "o", color=INK, ms=9, zorder=6)
-    ax.annotate("", xy=(2.5, pstar), xytext=(2.5, 7.5), arrowprops=dict(arrowstyle="<->", color=RED, lw=1.5))
-    ax.text(2.65, 8.6, "зазор $p^\\ast - d^\\ast = 2.5$", color=RED, fontsize=9.5)
-    ax.text(2.5, 6.6, "$\\mu^\\ast = 2.5,\\ d^\\ast = 7.5$", ha="center", fontsize=9.5)
-    ax.set(xlim=(0, 5), ylim=(-0.5, 12.5), xlabel="ставка штрафа $\\mu$", ylabel="расходы завода",
-           title="никакая ставка не воспроизводит запрет:\nзавод предпочитает платить или перевыполнять")
-    ax.legend(loc="lower right", fontsize=8)
-    save("10_indivisible_gap.png")
 
 
 # ---------------------------------------------------------------- 11 градиенты: множитель как сила стенки
@@ -550,17 +341,84 @@ def fig_gradients():
     save("11_gradients.png")
 
 
+# ---------------------------------------------------------------- 12 где живёт минимум: внутри или на границе
+def fig_where_is_min():
+    Q = np.array([[2.0, 0.5], [0.5, 1.0]])
+    Qinv = np.linalg.inv(Q)
+    cases = [(np.array([-1.0, -0.5]), "(а) безусловный минимум внутри ящика:\nограничения не при чём, $\\nabla f(x^\\ast)=0$"),
+             (np.array([-3.0, -1.0]), "(б) безусловный минимум снаружи:\nрешение на границе, грань $x_1=1$ активна")]
+    fig, axes = plt.subplots(1, 2, figsize=(10.6, 4.8))
+    xs = np.linspace(-1.6, 2.2, 240)
+    X1, X2 = np.meshgrid(xs, xs)
+    for ax, (c, title) in zip(axes, cases):
+        f = lambda x: 0.5 * x @ Q @ x + c @ x
+        x_free = -Qinv @ c                                   # безусловный минимум
+        xstar = minimize(f, x0=np.zeros(2), jac=lambda x: Q @ x + c, method="L-BFGS-B",
+                         bounds=[(-1, 1), (-1, 1)]).x
+        F = 0.5 * (Q[0, 0] * X1 ** 2 + 2 * Q[0, 1] * X1 * X2 + Q[1, 1] * X2 ** 2) + c[0] * X1 + c[1] * X2
+        ax.grid(False)
+        ax.contour(X1, X2, F, levels=18, colors=[GRAY], linewidths=0.7, alpha=0.9)
+        ax.add_patch(Rectangle((-1, -1), 2, 2, color=BLUE, alpha=0.10, lw=0))
+        ax.add_patch(Rectangle((-1, -1), 2, 2, fill=False, color=BLUE, lw=1.3, ls=":"))
+        inside = np.all(np.abs(x_free) <= 1)
+        ax.plot(*x_free, "x", color=RED, ms=11, mew=2.4, zorder=6)
+        ax.plot(*xstar, "o", color=INK, ms=10, zorder=7)
+        if inside:
+            assert np.allclose(x_free, [0.42857, 0.28571], atol=1e-4) and np.allclose(xstar, x_free, atol=1e-4)
+            ax.annotate("$x^\\ast$ = безусловный минимум\n$(0.43,\\,0.29)$, все $\\mu_i = 0$", xy=xstar, xytext=(-1.45, 1.25),
+                        arrowprops=dict(arrowstyle="->", color=INK, lw=1.1), fontsize=9.5)
+        else:
+            assert np.allclose(x_free, [1.42857, 0.28571], atol=1e-4) and np.allclose(xstar, [1.0, 0.5], atol=1e-4)
+            ax.plot([1, 1], [-1, 1], color=RED, lw=2.6, zorder=5)
+            ax.annotate("безусловный минимум $(1.43,\\,0.29)$\nза стенкой — недостижим", xy=x_free, xytext=(0.15, -1.45),
+                        arrowprops=dict(arrowstyle="->", color=RED, lw=1.1), fontsize=9.5, color=RED)
+            ax.annotate("$x^\\ast = (1,\\,0.5)$ на активной грани", xy=xstar, xytext=(-1.45, 1.25),
+                        arrowprops=dict(arrowstyle="->", color=INK, lw=1.1), fontsize=9.5)
+        ax.set(xlim=(-1.6, 2.2), ylim=(-1.6, 1.6), aspect="equal", xlabel="$x_1$", ylabel="$x_2$", title=title)
+    save("12_where_is_min.png")
+
+
+# ---------------------------------------------------------------- 13 равенство: касание линий уровня и кривой g = 0
+def fig_equality_tangency():
+    # прямоугольник в круге: min -4 x1 x2 при x1^2 + x2^2 = 1 (ДЗ 2); решение (1/sqrt2, 1/sqrt2)
+    xs = np.array([1, 1]) / np.sqrt(2)
+    grad_f = -4 * xs[::-1]                                   # (-4 x2, -4 x1)
+    grad_g = 2 * xs                                          # (2 x1, 2 x2)
+    lam = grad_f[0] / grad_g[0]
+    assert np.allclose(grad_f, lam * grad_g) and abs(lam + 2) < 1e-12
+
+    fig, ax = plt.subplots(figsize=(6.2, 5.6))
+    ax.grid(False)
+    t = np.linspace(-1.5, 1.5, 300)
+    X1, X2 = np.meshgrid(t, t)
+    cs = ax.contour(X1, X2, -4 * X1 * X2, levels=[-3, -2.5, -2, -1.5, -1, -0.5, 0.5, 1, 2], colors=[GRAY], linewidths=0.8)
+    ax.clabel(cs, fmt="%.1f", fontsize=7)
+    th = np.linspace(0, 2 * np.pi, 400)
+    ax.plot(np.cos(th), np.sin(th), color=RED, lw=2.4, label="$g(x)=x_1^2+x_2^2-1=0$")
+    ax.contour(X1, X2, -4 * X1 * X2, levels=[-2.0], colors=[BLUE], linewidths=2.2, linestyles="solid")
+    ax.plot(*xs, "o", color=INK, ms=10, zorder=7)
+    k = 0.18
+    ax.annotate("", xy=xs + k * grad_f, xytext=xs, arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=2.2, mutation_scale=15), zorder=8)
+    ax.annotate("", xy=xs + k * 0.5 * grad_g, xytext=xs, arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.2, mutation_scale=15), zorder=8)
+    ax.text(-0.95, 0.22, "$\\nabla f = (-2\\sqrt{2},-2\\sqrt{2})$", color=BLUE, fontsize=9.5)
+    ax.text(*(xs + k * 0.5 * grad_g + [0.05, 0.05]), "$\\nabla g = (\\sqrt{2},\\sqrt{2})$", color=RED, fontsize=9.5)
+    ax.text(-1.45, 1.25, "линия уровня $f=-2$ (синяя)\nкасается окружности в $x^\\ast$:\n$\\nabla f = \\lambda\\,\\nabla g$, $\\lambda = -2$", fontsize=9.5)
+    ax.text(0.78, 0.55, "$x^\\ast=(\\frac{1}{\\sqrt{2}},\\frac{1}{\\sqrt{2}})$", fontsize=9.5)
+    for p_, lab in (((1, 0), "$(1,0)$: максимум; баланс сил дал бы\n$\\mu=-4<0$ для стенки $x_2\\geq0$"),):
+        ax.plot(*p_, "s", color=GRAY, ms=7)
+        ax.text(p_[0] - 0.02, p_[1] - 0.2, lab, fontsize=8.5, color=GRAY, ha="right", va="top")
+    ax.set(xlim=(-1.5, 1.5), ylim=(-1.5, 1.5), aspect="equal", xlabel="$x_1$", ylabel="$x_2$",
+           title="равенство: в решении линия уровня $f$ касается кривой $g=0$")
+    ax.legend(loc="lower left", fontsize=9)
+    save("13_equality_tangency.png")
+
+
 if __name__ == "__main__":
     print("Сохраняю в", IMG)
     fig_recap_problems()
-    fig_weak_duality_line()
-    fig_lagrangian_family()
-    fig_geometric_duality()
-    fig_dual_function()
-    fig_nonconvex_gap()
     fig_lp_shadow_prices()
-    fig_diet_shadow_prices()
     fig_qp_dual()
     fig_sensitivity()
-    fig_indivisible_gap()
     fig_gradients()
+    fig_where_is_min()
+    fig_equality_tangency()

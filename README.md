@@ -19,7 +19,7 @@
 |---|------|--------|-----------|
 | 1 | 09.09 | Введение: постановка задачи, классы задач, примеры | [конспект](lectures/lecture01/lecture01.md) · [демо-ноутбук](lectures/lecture01/demo01.ipynb) · [разбор упражнений](lectures/lecture01/exercises01.ipynb) · [ДЗ 1](homeworks/hw01.md) (до 23.09) |
 | 2 | 16.09 | Выпуклость: множества, функции, задачи, условие оптимальности | [конспект](lectures/lecture02/lecture02.md) · [демо-ноутбук](lectures/lecture02/demo02.ipynb) · [разбор упражнений](lectures/lecture02/exercises02.ipynb) · [ДЗ 2](homeworks/hw02.md) (выдача 23.09, до 07.10) |
-| 3 | 23.09 | Двойственность Лагранжа | [конспект](lectures/lecture03/lecture03.md) · [демо-ноутбук](lectures/lecture03/demo03.ipynb) · [разбор упражнений](lectures/lecture03/exercises03.ipynb) |
+| 3 | 23.09 | Как учитывать ограничения: геометрия оптимума и множители Лагранжа | [конспект](lectures/lecture03/lecture03.md) · [демо-ноутбук](lectures/lecture03/demo03.ipynb) · [разбор упражнений](lectures/lecture03/exercises03.ipynb) |
 | 4–16 | 30.09 – 23.12 | см. [календарь в программе курса](syllabus.md#3-календарь) | появляются еженедельно |
 
 [Программа курса](syllabus.md): цели, календарь, домашние задания, проект, оценивание, литература.
