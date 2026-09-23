@@ -413,6 +413,120 @@ def fig_equality_tangency():
     save("13_equality_tangency.png")
 
 
+# ---------------------------------------------------------------- 14 цепь на полу: множители — силы реакции
+def chain_with_floor():
+    """Цепь из лекции 1 (§7.3): N грузов, пружины D, пол z >= 0.5 + 0.1 y. Возвращает решения и реакции пола."""
+    from scipy.optimize import LinearConstraint
+    N, D, g = 40, 70.0, 9.81
+    m = 4.0 / N
+    pl, pr = np.array([-2.0, 1.0]), np.array([2.0, 1.0])
+
+    def unpack(v):
+        return np.r_[pl[0], v[:N], pr[0]], np.r_[pl[1], v[N:], pr[1]]
+
+    def energy(v):
+        y, z = unpack(v)
+        return 0.5 * D * np.sum(np.diff(y) ** 2 + np.diff(z) ** 2) + m * g * np.sum(z[1:-1])
+
+    def grad(v):
+        y, z = unpack(v)
+        return np.r_[D * (2 * y[1:-1] - y[:-2] - y[2:]), D * (2 * z[1:-1] - z[:-2] - z[2:]) + m * g]
+
+    v0 = np.r_[np.linspace(pl[0], pr[0], N + 2)[1:-1], np.linspace(pl[1], pr[1], N + 2)[1:-1]]
+    free = minimize(energy, v0, jac=grad, method="BFGS", options={"gtol": 1e-8}).x
+    A = np.hstack((-0.1 * np.eye(N), np.eye(N)))                       # h_i = z_i - 0.1 y_i - 0.5 >= 0
+    con = minimize(energy, v0, jac=grad, method="SLSQP", constraints=[LinearConstraint(A, 0.5 * np.ones(N), np.inf)],
+                   options={"ftol": 1e-12, "maxiter": 500}).x
+    active = (A @ con - 0.5) < 1e-6
+    G = grad(con)
+    mu = np.zeros(N)
+    mu[active] = G[N:][active]                                          # баланс по z: dE/dz_i = mu_i
+    assert np.abs(G[:N][active] + 0.1 * mu[active]).max() < 1e-5       # баланс по y: dE/dy_i = -0.1 mu_i
+    assert np.abs(G[~np.r_[active, active]]).max() < 1e-5               # у висящих грузов dE = 0
+    assert active.sum() == 25 and abs(mu.sum() - 23.75) < 0.05
+    return N, m, g, unpack, free, con, active, mu
+
+
+def fig_chain_forces():
+    N, m, g, unpack, free, con, active, mu = chain_with_floor()
+    yf, zf = unpack(free)
+    yc, zc = unpack(con)
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    yy = np.linspace(-2.2, 2.2, 10)
+    ax.fill_between(yy, -2.3, 0.5 + 0.1 * yy, color=GRAY, alpha=0.15, lw=0)
+    ax.plot(yy, 0.5 + 0.1 * yy, color=INK, lw=1.4, ls="--", label="пол $z = 0.5 + 0.1y$")
+    ax.plot(yf, zf, color=GRAY, lw=1.4, ls=":", label="без пола: цепь провисает до $z\\approx-1.9$")
+    ax.plot(yc, zc, "-", color=BLUE, lw=1.8, zorder=4, label="с полом: 25 из 40 грузов лежат на полу")
+    ax.plot(yc[1:-1][~active], zc[1:-1][~active], "o", color=BLUE, ms=4, zorder=5)
+    ax.plot(yc[1:-1][active], zc[1:-1][active], "o", color=RED, ms=5, zorder=6)
+    k = 0.45
+    for i in np.where(active)[0][::2]:
+        ax.annotate("", xy=(yc[i + 1] - 0.1 * k * mu[i], zc[i + 1] + k * mu[i]), xytext=(yc[i + 1], zc[i + 1]),
+                    arrowprops=dict(arrowstyle="-|>", color=RED, lw=1.3, mutation_scale=10), zorder=7)
+    ax.text(0, 1.25, "реакция пола $\\mu_i\\approx0.97$ Н на каждый лежащий груз\n($mg=0.98$ Н); у висящих грузов $\\mu_i = 0$",
+            ha="center", fontsize=9.5, color=RED)
+    ax.text(-2.1, -1.5, "всего вес $39$ Н: пол несёт $\\sum\\mu_i = 24$ Н,\nостальное — крепления", fontsize=9, color=GRAY)
+    ax.plot([-2, 2], [1, 1], "s", color=INK, ms=7)
+    ax.set(xlim=(-2.3, 2.3), ylim=(-2.2, 1.6), xlabel="$y$", ylabel="$z$",
+           title="цепь на полу: множители ограничений $z_i \\geq 0.5 + 0.1 y_i$ — силы реакции пола")
+    ax.legend(loc="lower right", fontsize=8.5)
+    ax.grid(False)
+    save("14_chain_forces.png")
+
+
+# ---------------------------------------------------------------- 15 портфель Марковица: множители — цены
+PF_R = np.array([0.04, 0.08, 0.11, 0.15])                              # ожидаемые доходности
+PF_VOL = np.array([0.05, 0.12, 0.18, 0.30])                            # волатильности
+PF_CORR = np.array([[1, 0.2, 0.1, 0.0], [0.2, 1, 0.5, 0.3], [0.1, 0.5, 1, 0.4], [0.0, 0.3, 0.4, 1.0]])
+PF_SIGMA = np.outer(PF_VOL, PF_VOL) * PF_CORR
+
+
+def portfolio(target):
+    """min 1/2 x'Sx при r'x >= target, sum x = 1, x >= 0; множители — из баланса сил по активному набору."""
+    S, r = PF_SIGMA, PF_R
+    res = minimize(lambda x: 0.5 * x @ S @ x, x0=np.ones(4) / 4, jac=lambda x: S @ x, method="SLSQP", bounds=[(0, 1)] * 4,
+                   constraints=[{"type": "eq", "fun": lambda x: x.sum() - 1, "jac": lambda x: np.ones(4)},
+                                {"type": "ineq", "fun": lambda x: r @ x - target, "jac": lambda x: r}],
+                   options={"ftol": 1e-13, "maxiter": 500})
+    x = res.x
+    act0 = x < 1e-6
+    M = np.c_[np.ones(4), r, np.eye(4)[:, act0]]                       # grad f = lam*1 + mu_r*r + sum mu_i e_i
+    sol = np.linalg.lstsq(M, S @ x, rcond=None)[0]
+    assert np.abs(M @ sol - S @ x).max() < 1e-6
+    lam, mu_r, mu_b = sol[0], sol[1], np.zeros(4)
+    mu_b[act0] = sol[2:]
+    return x, res.fun, lam, mu_r, mu_b
+
+
+def fig_portfolio():
+    targets = np.linspace(0.045, 0.145, 41)
+    risks = np.array([portfolio(tg)[1] for tg in targets])
+    x, risk, lam, mu_r, mu_b = portfolio(0.12)
+    assert np.allclose(x, [0, 0.1414, 0.5026, 0.356], atol=2e-3) and abs(mu_r - 0.473) < 5e-3 and mu_b[0] > 0
+    slope_fd = (portfolio(0.1205)[1] - portfolio(0.1195)[1]) / 0.001
+    assert abs(slope_fd - mu_r) < 5e-3
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.3), gridspec_kw=dict(width_ratios=[1.25, 1]))
+    ax = axes[0]
+    ax.plot(100 * targets, risks, color=BLUE, lw=2.2)
+    ax.plot(12, risk, "o", color=INK, ms=9, zorder=6)
+    tt = np.linspace(0.105, 0.135, 5)
+    ax.plot(100 * tt, risk + mu_r * (tt - 0.12), color=RED, lw=1.5, ls="--")
+    ax.annotate(f"наклон $=\\mu_r={mu_r:.2f}$:\n$+1$ п.п. доходности стоит\n$+{mu_r/100:.4f}$ риска", xy=(12, risk), xytext=(5.2, 0.017),
+                arrowprops=dict(arrowstyle="->", color=RED, lw=1.1), fontsize=9, color=RED)
+    ax.set(xlabel="требуемая доходность, % годовых", ylabel="минимальный риск $\\frac{1}{2} x^\\top\\Sigma x$",
+           title="цена доходности: наклон границы = множитель")
+    ax = axes[1]
+    names = ["A\n4%", "B\n8%", "C\n11%", "D\n15%"]
+    bars = ax.bar(names, x, color=[RED if a else BLUE for a in mu_b > 0], width=0.55)
+    for bb, v in zip(bars, x):
+        ax.text(bb.get_x() + bb.get_width() / 2, v + 0.01, f"{v:.2f}", ha="center", fontsize=9.5)
+    ax.text(0, 0.12, f"доля $0$: запрет шортов\nактивен, $\\mu_A={mu_b[0]:.4f}$\n(«хотелось бы\nзашортить»)", ha="center", fontsize=8.5, color=RED)
+    ax.set(ylim=(0, 0.62), ylabel="доля в портфеле $x_i^\\ast$", title="портфель при цели 12%: кто не куплен")
+    ax.grid(axis="x")
+    save("15_portfolio.png")
+
+
 if __name__ == "__main__":
     print("Сохраняю в", IMG)
     fig_recap_problems()
@@ -422,3 +536,5 @@ if __name__ == "__main__":
     fig_gradients()
     fig_where_is_min()
     fig_equality_tangency()
+    fig_chain_forces()
+    fig_portfolio()
