@@ -556,11 +556,20 @@ md(r"""## Шпаргалка
 3. **Ньютон не «всегда быстрее».** Квадратичная сходимость — только вблизи минимума; из $(-1.2,1)$ первые два шага на Розенброке ошибку не уменьшили, а второй увеличил почти вдвое. Что с этим делать — лекция 5.""")
 
 # ============================================================ сборка
-nb = nbf.v4.new_notebook(cells=cells)
-nb.metadata.update({
-    "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-    "language_info": {"name": "python"},
-})
-nbf.validate(nb)
-nbf.write(nb, OUT)
-print(f"{OUT}: {len(cells)} ячеек")
+# build_lecture04.py импортирует этот модуль и берёт из него `cells`, чтобы
+# вставить те же демонстрации в конспект-ноутбук lecture04.ipynb.
+
+
+def main() -> None:
+    nb = nbf.v4.new_notebook(cells=cells)
+    nb.metadata.update({
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python"},
+    })
+    nbf.validate(nb)
+    nbf.write(nb, OUT)
+    print(f"{OUT}: {len(cells)} ячеек")
+
+
+if __name__ == "__main__":
+    main()

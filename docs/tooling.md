@@ -48,6 +48,13 @@ uv run python lectures/lecture01/build_exercises01.py     # exercises01.ipynb (�
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/demo01.ipynb lectures/lecture01/exercises01.ipynb
 ```
 
+Начиная с лекции 4 конспект-ноутбук содержит и код демонстраций, поэтому собирается не `md2nb.py`, а своим скриптом, и после сборки выполняется:
+
+```bash
+uv run python lectures/lecture04/build_lecture04.py                     # lecture04.md + ячейки из build_demo04.py -> lecture04.ipynb
+uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/lecture04.ipynb
+```
+
 Правило: конспект редактируется в `.md`, ноутбук-версия пересобирается скриптом и не правится руками. Демо и разбор упражнений редактируются в `build_*.py`, ноутбуки пересобираются и выполняются `nbconvert`, чтобы выводы и картинки лежали в репозитории. Иллюстрации 07–10 повторяют демонстрации ноутбука с теми же данными и seed, чтобы конспект и демо совпадали.
 
 Проверить, что ноутбуки выполняются без ошибок:
