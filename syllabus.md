@@ -127,7 +127,7 @@
 syllabus.md                 программа курса (этот файл)
 pyproject.toml, uv.lock     зависимости Python (uv); requirements.txt — для pip
 lectures/lectureNN/
-    lectureNN.md, .ipynb    конспект лекции NN (ноутбук собирается из md: tools/md2nb.py)
+    lectureNN.md, .ipynb    конспект лекции NN (ноутбук собирается из md: tools/md2nb.py; с лекции 4 — build_lectureNN.py, он добавляет в конспект код демо)
     demoNN.ipynb            демонстрации к лекции
     make_figures.py, img/   иллюстрации конспекта и скрипт, который их строит
     exercisesNN.md          разбор упражнений конспекта
