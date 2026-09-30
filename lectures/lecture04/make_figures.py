@@ -249,25 +249,24 @@ def fig_descent_direction():
     ax = axes[1]
     a = np.linspace(0, 0.32, 400)
     phi = np.array([f(x - ai * g) for ai in a])
-    ax.plot(a, phi, color=INK, label="$\\varphi(\\alpha)=f(x-\\alpha\\nabla f)$")
-    c = 1e-4
-    Lc = 10.0
     a_exact = (g @ g) / (g @ Q @ g)
-    a_const = 1 / Lc
-    # backtracking: 1, 1/2, 1/4, 1/8
+    a_const = 1 / 10.0
     a_bt, fx = 1.0, f(x)
-    tried = []
-    while f(x - a_bt * g) > fx - c * a_bt * (g @ g):
-        tried.append(a_bt); a_bt /= 2
+    while f(x - a_bt * g) > fx - 1e-4 * a_bt * (g @ g):
+        a_bt /= 2
     assert abs(a_bt - 0.125) < 1e-12 and abs(a_exact - 109 / 1009) < 1e-12
-    ax.plot(a_exact, f(x - a_exact * g), "*", color=RED, ms=13, label=f"точный шаг $\\alpha^*={a_exact:.3f}$", zorder=7)
-    ax.plot(a_const, f(x - a_const * g), "o", color=BLUE, ms=8, label=f"постоянный $\\alpha=1/L={a_const:.2f}$", zorder=7)
-    ax.plot(a_bt, f(x - a_bt * g), "s", color=ORANGE, ms=8, label=f"backtracking: $1\\to\\frac{{1}}{{2}}\\to\\frac{{1}}{{4}}\\to{a_bt}$", zorder=7)
-    ax.plot(a, fx - c * a * (g @ g), "--", color=GRAY, lw=1, label="условие Армихо (почти горизонталь)")
-    ax.axhline(fx, color=GRAY, lw=0.6)
-    ax.set(xlim=(0, 0.32), ylim=(0, 20), xlabel="$\\alpha$", ylabel="$\\varphi(\\alpha)$",
-           title="Один шаг из $x=(3,1)$ на $f=\\frac{1}{2}(x_1^2+10x_2^2)$")
-    ax.legend(loc="upper right", fontsize=8.5)
+    ax.plot(a, phi, color=INK, lw=2.2)
+    ax.axhline(fx, color=GRAY, lw=0.8, ls="--")
+    ax.text(0.005, fx + 0.5, "$\\varphi(0)=f(x)$ — где стоим", color=GRAY, fontsize=9)
+    ax.plot(a_exact, f(x - a_exact * g), "*", color=RED, ms=14, zorder=7)
+    ax.annotate(f"точный шаг $\\alpha^*={a_exact:.3f}$:\nниже некуда", (a_exact, f(x - a_exact * g)), (0.13, 1.2),
+                fontsize=9.5, color=RED, arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.annotate("слишком малый шаг:\nпочти не сдвинулись", (0.012, phi[np.searchsorted(a, 0.012)]), (0.015, 13.5),
+                fontsize=9.5, color=BLUE, arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
+    ax.annotate("слишком большой шаг:\nперелетели дно, стало хуже", (0.24, phi[np.searchsorted(a, 0.24)]), (0.115, 16.5),
+                fontsize=9.5, color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
+    ax.set(xlim=(0, 0.32), ylim=(0, 20), xlabel="длина шага $\\alpha$", ylabel="$\\varphi(\\alpha)=f(x-\\alpha\\nabla f)$",
+           title="Функция одного шага: идём из $x=(3,1)$ против градиента")
     save("03_descent_direction.png")
     return a_exact, a_const, a_bt
 
@@ -420,59 +419,61 @@ def fig_newton_teaser():
     return kappa, kg, kn, kc
 
 
-# ================================================================ 08 лемма о спуске и множители сжатия
+# ================================================================ 08 лемма о спуске — одна панель
 def fig_descent_lemma():
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.2))
-    # (а) одномерная картинка: f и парабола с кривизной L, касающаяся в x_k
-    ax = axes[0]
+    fig, ax = plt.subplots(figsize=(8.2, 4.6))
     L = 10.0
     f = lambda t: 0.5 * L * t ** 2 * 0.55 + 0.3 * np.sin(3 * t)          # гладкая, кривизна <= L
     df = lambda t: L * 0.55 * t + 0.9 * np.cos(3 * t)
-    d2f_max = L * 0.55 + 0.3 * 9
-    assert d2f_max <= L + 1e-9
+    assert L * 0.55 + 0.3 * 9 <= L + 1e-9
     xk = 1.2
     t = np.linspace(-0.6, 1.7, 400)
-    ax.plot(t, f(t), color=INK, label="$f$")
     g = df(xk)
     par = f(xk) + g * (t - xk) + 0.5 * L * (t - xk) ** 2
-    ax.plot(t, par, color=ORANGE, lw=1.6, label="верхняя парабола: $f(x_k)+\\nabla f^\\top p+\\frac{L}{2}\\|p\\|^2$")
+    ax.plot(t, f(t), color=INK, lw=2.4, label="функция $f$")
+    ax.plot(t, par, color=ORANGE, lw=1.8, label="парабола кривизны $L$: $f(x_k)+f'(x_k)\\,p+\\frac{L}{2}p^2$")
+    ax.plot(t, f(xk) + g * (t - xk), color=GRAY, lw=1, ls=":", label="касательная")
     ax.axhline(f(xk), color=GRAY, lw=0.8, ls="--")
     x1 = xk - g / L; x2 = xk - 2 * g / L
-    ax.plot(xk, f(xk), "o", color=INK, ms=7, zorder=7)
-    ax.plot(x1, f(xk) + g * (x1 - xk) + 0.5 * L * (x1 - xk) ** 2, "*", color=RED, ms=13, zorder=7)
-    ax.plot(x2, f(xk), "s", color=ORANGE, ms=7, zorder=7)
-    ax.plot(x1, f(x1), "o", color=BLUE, ms=6, zorder=7)
-    ax.annotate("$x_k$", (xk, f(xk)), (xk + 0.05, f(xk) + 0.6), fontsize=10)
-    ax.annotate("$\\alpha=1/L$: минимум параболы", (x1, f(xk) + g * (x1 - xk) + 0.5 * L * (x1 - xk) ** 2),
-                (x1 - 0.95, f(xk) - 1.4), fontsize=9, color=RED, arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
-    ax.annotate("$\\alpha=2/L$: парабола вернулась\nна уровень $f(x_k)$ — граница", (x2, f(xk)), (x2 - 0.9, f(xk) + 1.6),
-                fontsize=9, color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
-    ax.text(x1 - 0.55, f(x1) - 0.9, "настоящее $f$ ещё ниже", fontsize=9, color=BLUE)
-    ax.set(xlim=(-0.6, 1.7), ylim=(-1.6, f(xk) + 3.2), xlabel="$x$", yticks=[], title="Лемма о спуске: $f$ лежит под параболой кривизны $L$")
-    ax.legend(loc="lower right", fontsize=8.5)
+    y1 = f(xk) + g * (x1 - xk) + 0.5 * L * (x1 - xk) ** 2
+    ax.plot(xk, f(xk), "o", color=INK, ms=8, zorder=7)
+    ax.plot(x1, y1, "*", color=RED, ms=15, zorder=7)
+    ax.plot(x2, f(xk), "s", color=ORANGE, ms=8, zorder=7)
+    ax.annotate("$x_k$: здесь стоим", (xk, f(xk)), (xk + 0.05, f(xk) + 1.0), fontsize=10)
+    ax.annotate("шаг $1/L$: минимум параболы,\nфункция здесь ещё ниже", (x1, y1), (x1 - 0.45, y1 - 1.9), fontsize=10, color=RED,
+                ha="center", arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.annotate("шаг $2/L$: парабола вернулась\nна уровень $f(x_k)$ — дальше гарантии нет", (x2, f(xk)), (x2 + 0.05, f(xk) + 2.4),
+                fontsize=10, color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
+    ax.set(xlim=(-0.6, 1.7), ylim=(-1.6, f(xk) + 3.6), xlabel="$x$", yticks=[],
+           title="Лемма о спуске: кривизна $f$ не больше $L$, значит $f$ лежит под параболой")
+    ax.legend(loc="lower right", fontsize=9)
+    save("08_descent_lemma.png")
 
-    # (б) множители сжатия компонент как функции шага
-    ax = axes[1]
+
+# ================================================================ 09 множители сжатия компонент как функции шага
+def fig_step_multipliers():
+    fig, ax = plt.subplots(figsize=(8.2, 4.4))
     kappa = 50.0; lmin, lmax = 1.0, kappa
     a = np.linspace(0, 2.4 / kappa, 400)
-    ax.plot(a, np.abs(1 - a * lmin), color=BLUE, label="$|1-\\alpha\\lambda_{\\min}|$ — медленная компонента")
-    ax.plot(a, np.abs(1 - a * lmax), color=ORANGE, label="$|1-\\alpha\\lambda_{\\max}|$ — быстрая компонента")
-    ax.plot(a, np.maximum(np.abs(1 - a * lmin), np.abs(1 - a * lmax)), color=INK, lw=3, alpha=0.25, label="множитель метода: максимум из двух")
+    ax.plot(a, np.abs(1 - a * lmin), color=BLUE, lw=2.2, label="медленная компонента (вдоль $\\lambda_{\\min}=1$): $|1-\\alpha\\lambda_{\\min}|$")
+    ax.plot(a, np.abs(1 - a * lmax), color=ORANGE, lw=2.2, label="быстрая компонента (вдоль $\\lambda_{\\max}=50$): $|1-\\alpha\\lambda_{\\max}|$")
     ax.axhline(1, color=RED, lw=1, ls="--")
+    ax.text(0.001, 1.03, "множитель 1: компонента не убывает", color=RED, fontsize=9)
     a_best = 2 / (lmin + lmax); q_best = (kappa - 1) / (kappa + 1)
     assert abs(np.abs(1 - a_best * lmin) - q_best) < 1e-12 and abs(np.abs(1 - a_best * lmax) - q_best) < 1e-12
-    ax.plot(a_best, q_best, "*", color=RED, ms=13, zorder=7)
-    ax.plot(1 / lmax, 1 - 1 / kappa, "o", color=BLUE, ms=7, zorder=7)
-    ax.annotate(f"$\\alpha=1/\\lambda_{{\\max}}$: множитель $1-1/\\kappa={1 - 1 / kappa:.2f}$", (1 / lmax, 1 - 1 / kappa), (0.002, 0.62), fontsize=9, color=BLUE,
-                arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
-    ax.annotate(f"лучший $\\alpha=\\frac{{2}}{{\\lambda_{{\\max}}+\\lambda_{{\\min}}}}$: $\\frac{{\\kappa-1}}{{\\kappa+1}}={q_best:.3f}$", (a_best, q_best), (0.0045, 0.35), fontsize=9, color=RED,
-                arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
-    ax.annotate("$\\alpha=2/\\lambda_{\\max}$: множитель 1 — расходимость", (2 / lmax, 1), (0.0215, 1.22), fontsize=9, color=RED,
-                arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
-    ax.set(xlim=(0, 2.4 / kappa), ylim=(0, 1.75), xlabel="шаг $\\alpha$", ylabel="множитель сжатия за итерацию",
-           title=f"$\\frac{{1}}{{2}}(x_1^2+\\kappa x_2^2)$, $\\kappa={int(kappa)}$: чем сжимается каждая компонента")
-    ax.legend(loc="upper left", fontsize=8.5)
-    save("08_descent_lemma.png")
+    ax.plot(a_best, q_best, "*", color=RED, ms=15, zorder=7)
+    ax.plot(1 / lmax, 1 - 1 / kappa, "o", color=BLUE, ms=8, zorder=7)
+    ax.plot(2 / lmax, 1, "s", color=RED, ms=8, zorder=7)
+    ax.annotate(f"шаг $1/\\lambda_{{\\max}}$: быстрая компонента исчезает за шаг,\nмедленная сжимается лишь в $1-1/\\kappa={1 - 1 / kappa:.2f}$",
+                (1 / lmax, 1 - 1 / kappa), (0.0255, 0.12), fontsize=9.5, color=BLUE, arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
+    ax.annotate(f"лучший шаг $\\frac{{2}}{{\\lambda_{{\\max}}+\\lambda_{{\\min}}}}$: обе компоненты\nсжимаются одинаково, в $\\frac{{\\kappa-1}}{{\\kappa+1}}={q_best:.3f}$",
+                (a_best, q_best), (0.0012, 0.16), fontsize=9, color=RED, arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.annotate("шаг $2/\\lambda_{\\max}$: быстрая компонента\nперестаёт убывать — граница", (2 / lmax, 1), (0.022, 1.28),
+                fontsize=9.5, color=RED, arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.set(xlim=(0, 2.4 / kappa), ylim=(0, 1.7), xlabel="длина шага $\\alpha$", ylabel="во сколько раз сжалась компонента за итерацию",
+           title="$\\frac{1}{2}(x_1^2+50x_2^2)$: каждая компонента ошибки живёт своей жизнью")
+    ax.legend(loc="upper left", fontsize=9)
+    save("09_step_multipliers.png")
 
 
 # ================================================================ проверки чисел для конспекта
@@ -500,6 +501,7 @@ if __name__ == "__main__":
     k_scaling = fig_scaling()
     kappa, kg, kn, kc = fig_newton_teaser()
     fig_descent_lemma()
+    fig_step_multipliers()
     L = check_chain()
     print(f"проверки: κ Розенброка = {kappa:.1f}; GD backtracking {kg}, постоянный шаг 0.001: {kc}, Ньютон {kn};")
     print(f"          зигзаг: {zig}; масштабирование: {k_scaling} итераций до замены; цепь N=40: L = {L:.1f}")
