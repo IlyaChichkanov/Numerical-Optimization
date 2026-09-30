@@ -143,8 +143,8 @@ def fig_hooks():
 
     ax = axes[2]
     age, exp_, lab = logistic_data()
-    ax.plot(age[lab == 1], exp_[lab == 1], "o", ms=4, color=BLUE, label="класс $+1$")
-    ax.plot(age[lab == 0], exp_[lab == 0], "s", ms=4, color=ORANGE, label="класс $-1$")
+    ax.plot(age[lab == 1], exp_[lab == 1], "o", ms=4, color=BLUE, label="$y=1$")
+    ax.plot(age[lab == 0], exp_[lab == 0], "s", ms=4, color=ORANGE, label="$y=0$")
     ax.set(xlabel="возраст, лет", ylabel="стаж, лет", title="Логистическая регрессия: найти разделяющую прямую")
     ax.legend(loc="upper left", fontsize=8.5)
     save("00_hooks.png")
@@ -420,6 +420,61 @@ def fig_newton_teaser():
     return kappa, kg, kn, kc
 
 
+# ================================================================ 08 лемма о спуске и множители сжатия
+def fig_descent_lemma():
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.2))
+    # (а) одномерная картинка: f и парабола с кривизной L, касающаяся в x_k
+    ax = axes[0]
+    L = 10.0
+    f = lambda t: 0.5 * L * t ** 2 * 0.55 + 0.3 * np.sin(3 * t)          # гладкая, кривизна <= L
+    df = lambda t: L * 0.55 * t + 0.9 * np.cos(3 * t)
+    d2f_max = L * 0.55 + 0.3 * 9
+    assert d2f_max <= L + 1e-9
+    xk = 1.2
+    t = np.linspace(-0.6, 1.7, 400)
+    ax.plot(t, f(t), color=INK, label="$f$")
+    g = df(xk)
+    par = f(xk) + g * (t - xk) + 0.5 * L * (t - xk) ** 2
+    ax.plot(t, par, color=ORANGE, lw=1.6, label="верхняя парабола: $f(x_k)+\\nabla f^\\top p+\\frac{L}{2}\\|p\\|^2$")
+    ax.axhline(f(xk), color=GRAY, lw=0.8, ls="--")
+    x1 = xk - g / L; x2 = xk - 2 * g / L
+    ax.plot(xk, f(xk), "o", color=INK, ms=7, zorder=7)
+    ax.plot(x1, f(xk) + g * (x1 - xk) + 0.5 * L * (x1 - xk) ** 2, "*", color=RED, ms=13, zorder=7)
+    ax.plot(x2, f(xk), "s", color=ORANGE, ms=7, zorder=7)
+    ax.plot(x1, f(x1), "o", color=BLUE, ms=6, zorder=7)
+    ax.annotate("$x_k$", (xk, f(xk)), (xk + 0.05, f(xk) + 0.6), fontsize=10)
+    ax.annotate("$\\alpha=1/L$: минимум параболы", (x1, f(xk) + g * (x1 - xk) + 0.5 * L * (x1 - xk) ** 2),
+                (x1 - 0.95, f(xk) - 1.4), fontsize=9, color=RED, arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.annotate("$\\alpha=2/L$: парабола вернулась\nна уровень $f(x_k)$ — граница", (x2, f(xk)), (x2 - 0.9, f(xk) + 1.6),
+                fontsize=9, color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
+    ax.text(x1 - 0.55, f(x1) - 0.9, "настоящее $f$ ещё ниже", fontsize=9, color=BLUE)
+    ax.set(xlim=(-0.6, 1.7), ylim=(-1.6, f(xk) + 3.2), xlabel="$x$", yticks=[], title="Лемма о спуске: $f$ лежит под параболой кривизны $L$")
+    ax.legend(loc="lower right", fontsize=8.5)
+
+    # (б) множители сжатия компонент как функции шага
+    ax = axes[1]
+    kappa = 50.0; lmin, lmax = 1.0, kappa
+    a = np.linspace(0, 2.4 / kappa, 400)
+    ax.plot(a, np.abs(1 - a * lmin), color=BLUE, label="$|1-\\alpha\\lambda_{\\min}|$ — медленная компонента")
+    ax.plot(a, np.abs(1 - a * lmax), color=ORANGE, label="$|1-\\alpha\\lambda_{\\max}|$ — быстрая компонента")
+    ax.plot(a, np.maximum(np.abs(1 - a * lmin), np.abs(1 - a * lmax)), color=INK, lw=3, alpha=0.25, label="множитель метода: максимум из двух")
+    ax.axhline(1, color=RED, lw=1, ls="--")
+    a_best = 2 / (lmin + lmax); q_best = (kappa - 1) / (kappa + 1)
+    assert abs(np.abs(1 - a_best * lmin) - q_best) < 1e-12 and abs(np.abs(1 - a_best * lmax) - q_best) < 1e-12
+    ax.plot(a_best, q_best, "*", color=RED, ms=13, zorder=7)
+    ax.plot(1 / lmax, 1 - 1 / kappa, "o", color=BLUE, ms=7, zorder=7)
+    ax.annotate(f"$\\alpha=1/\\lambda_{{\\max}}$: множитель $1-1/\\kappa={1 - 1 / kappa:.2f}$", (1 / lmax, 1 - 1 / kappa), (0.002, 0.62), fontsize=9, color=BLUE,
+                arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
+    ax.annotate(f"лучший $\\alpha=\\frac{{2}}{{\\lambda_{{\\max}}+\\lambda_{{\\min}}}}$: $\\frac{{\\kappa-1}}{{\\kappa+1}}={q_best:.3f}$", (a_best, q_best), (0.0045, 0.35), fontsize=9, color=RED,
+                arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.annotate("$\\alpha=2/\\lambda_{\\max}$: множитель 1 — расходимость", (2 / lmax, 1), (0.0215, 1.22), fontsize=9, color=RED,
+                arrowprops=dict(arrowstyle="-", color=RED, lw=0.8))
+    ax.set(xlim=(0, 2.4 / kappa), ylim=(0, 1.75), xlabel="шаг $\\alpha$", ylabel="множитель сжатия за итерацию",
+           title=f"$\\frac{{1}}{{2}}(x_1^2+\\kappa x_2^2)$, $\\kappa={int(kappa)}$: чем сжимается каждая компонента")
+    ax.legend(loc="upper left", fontsize=8.5)
+    save("08_descent_lemma.png")
+
+
 # ================================================================ проверки чисел для конспекта
 def check_chain():
     for N, expect in ((10, 48.4), (20, 178.1), (40, 680.6), (80, 2658.4)):
@@ -444,6 +499,7 @@ if __name__ == "__main__":
     fig_rates(zig)
     k_scaling = fig_scaling()
     kappa, kg, kn, kc = fig_newton_teaser()
+    fig_descent_lemma()
     L = check_chain()
     print(f"проверки: κ Розенброка = {kappa:.1f}; GD backtracking {kg}, постоянный шаг 0.001: {kc}, Ньютон {kn};")
     print(f"          зигзаг: {zig}; масштабирование: {k_scaling} итераций до замены; цепь N=40: L = {L:.1f}")
