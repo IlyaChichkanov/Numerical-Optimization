@@ -476,6 +476,39 @@ def fig_step_multipliers():
     save("09_step_multipliers.png")
 
 
+# ================================================================ 12: квадратичные ландшафты в 3D
+def fig_quadric_3d():
+    """Три поверхности 1/2 x^T Q x: чаша, седло, жёлоб — таблица раздела 3 в 3D."""
+    cases = (
+        (np.diag([1.0, 3.0]), "чаша: $\\lambda=1,\\;3$ — минимум"),
+        (np.diag([1.0, -2.0]), "седло: $\\lambda=1,\\;-2$ — не минимум"),
+        (np.diag([1.0, 0.0]), "жёлоб: $\\lambda=1,\\;0$ — прямая минимумов"),
+    )
+    lim = 1.6
+    X, Y = np.meshgrid(np.linspace(-lim, lim, 120), np.linspace(-lim, lim, 120))
+    fig = plt.figure(figsize=(12, 3.9))
+    for i, (Q, title) in enumerate(cases, 1):
+        Z = 0.5 * (Q[0, 0] * X**2 + Q[1, 1] * Y**2)
+        ax = fig.add_subplot(1, 3, i, projection="3d")
+        ax.plot_surface(X, Y, Z, cmap="Blues_r", alpha=0.72, rcount=60, ccount=60, linewidth=0)
+        ax.contour(X, Y, Z, levels=7, colors=GRAY, linewidths=0.5, offset=float(Z.min()))
+        if i == 1:
+            ax.computed_zorder = False
+            ax.scatter([0], [0], [0.05], color=RED, s=70, depthshade=False, zorder=10, edgecolors="white", linewidths=0.8)
+        if i == 3:
+            ax.computed_zorder = False
+            t = np.linspace(-lim, lim, 50)
+            ax.plot(np.zeros_like(t), t, np.full_like(t, 0.03), color=RED, lw=2.5, zorder=10)
+        ax.view_init(elev=27, azim=-60)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("$x_1$", labelpad=-4); ax.set_ylabel("$x_2$", labelpad=-4)
+        ax.set_zticks([]); ax.set_xticks([-1, 0, 1]); ax.set_yticks([-1, 0, 1]); ax.tick_params(pad=-2, labelsize=7)
+        ax.grid(False)
+    plt.savefig(IMG / "12_quadric_3d.png", bbox_inches="tight")
+    plt.close()
+    print("  ", "12_quadric_3d.png")
+
+
 # ================================================================ проверки чисел для конспекта
 def check_chain():
     for N, expect in ((10, 48.4), (20, 178.1), (40, 680.6), (80, 2658.4)):
@@ -502,6 +535,7 @@ if __name__ == "__main__":
     kappa, kg, kn, kc = fig_newton_teaser()
     fig_descent_lemma()
     fig_step_multipliers()
+    fig_quadric_3d()
     L = check_chain()
     print(f"проверки: κ Розенброка = {kappa:.1f}; GD backtracking {kg}, постоянный шаг 0.001: {kc}, Ньютон {kn};")
     print(f"          зигзаг: {zig}; масштабирование: {k_scaling} итераций до замены; цепь N=40: L = {L:.1f}")

@@ -51,7 +51,7 @@ uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/de
 Начиная с лекции 4 конспект-ноутбук содержит и код демонстраций, поэтому собирается не `md2nb.py`, а своим скриптом, и после сборки выполняется:
 
 ```bash
-uv run python lectures/lecture04/build_lecture04.py                     # lecture04.md + ячейки из build_demo04.py -> lecture04.ipynb
+uv run python lectures/lecture04/build_lecture04.py                     # lecture04.md + ячейки из build_demo04.py -> lecture04.ipynb (+ l4helpers.py)
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/lecture04.ipynb
 ```
 
