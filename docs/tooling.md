@@ -54,6 +54,8 @@ uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/de
 uv run python lectures/lecture04/build_lecture04.py                     # lecture04.md + ячейки из build_demo04.py -> lecture04.ipynb (+ l4helpers.py)
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/lecture04.ipynb
 uv run --group casadi jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/exercises04.ipynb   # разбору нужна группа casadi
+uv run python lectures/lecture04/build_seminar04.py                     # seminar04.ipynb (CasADi)
+uv run --group casadi jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/seminar04.ipynb
 ```
 
 Правило: конспект редактируется в `.md`, ноутбук-версия пересобирается скриптом и не правится руками. Демо и разбор упражнений редактируются в `build_*.py`, ноутбуки пересобираются и выполняются `nbconvert`, чтобы выводы и картинки лежали в репозитории. Иллюстрации 07–10 повторяют демонстрации ноутбука с теми же данными и seed, чтобы конспект и демо совпадали.
