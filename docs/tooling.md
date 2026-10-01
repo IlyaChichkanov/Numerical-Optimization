@@ -33,7 +33,7 @@ tools/                      вспомогательные скрипты
 Группы зависимостей в `pyproject.toml`:
 
 - `notebooks` (по умолчанию) — JupyterLab, ipykernel, nbformat;
-- `casadi` — CasADi, понадобится с лекции 7: `uv sync --group casadi`;
+- `casadi` — CasADi, используется с семинара лекции 4 (упражнение 12.10): `uv sync --group casadi`;
 - `docs` (по умолчанию) — пакет `markdown` для сборки HTML/PDF.
 
 Альтернатива без uv: `pip install -r requirements.txt` в виртуальном окружении.
@@ -53,6 +53,7 @@ uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/de
 ```bash
 uv run python lectures/lecture04/build_lecture04.py                     # lecture04.md + ячейки из build_demo04.py -> lecture04.ipynb (+ l4helpers.py)
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/lecture04.ipynb
+uv run --group casadi jupyter nbconvert --to notebook --execute --inplace lectures/lecture04/exercises04.ipynb   # разбору нужна группа casadi
 ```
 
 Правило: конспект редактируется в `.md`, ноутбук-версия пересобирается скриптом и не правится руками. Демо и разбор упражнений редактируются в `build_*.py`, ноутбуки пересобираются и выполняются `nbconvert`, чтобы выводы и картинки лежали в репозитории. Иллюстрации 07–10 повторяют демонстрации ноутбука с теми же данными и seed, чтобы конспект и демо совпадали.

@@ -113,19 +113,9 @@ def chain_solution(N=40):
     return y, z
 
 
-# ---------------------------------------------------------------- логистическая регрессия (синтетика)
-def logistic_data(seed=4, n=200):
-    rng = np.random.default_rng(seed)
-    z1, z2 = rng.normal(0, 1, n), rng.normal(0, 1, n)
-    p = 1 / (1 + np.exp(-(1.5 * z1 - 1.0 * z2 + 0.3)))
-    y = (rng.uniform(size=n) < p).astype(float)
-    age, exp_ = 40 + 10 * z1, 5 + z2
-    return age, exp_, y
-
-
-# ================================================================ 00 три задачи-крючка
+# ================================================================ 00 две задачи-крючка
 def fig_hooks():
-    fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.9))
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.9))
     ax = axes[0]
     rosen_contour(ax)
     ax.plot(-1.2, 1, "o", color=BLUE, ms=7, zorder=7)
@@ -141,12 +131,6 @@ def fig_hooks():
     ax.plot([-2, 2], [1, 1], "s", color=INK, ms=6)
     ax.set(xlabel="$y$", ylabel="$z$", title="Цепь: 40 грузов, 80 переменных, минимум энергии")
 
-    ax = axes[2]
-    age, exp_, lab = logistic_data()
-    ax.plot(age[lab == 1], exp_[lab == 1], "o", ms=4, color=BLUE, label="$y=1$")
-    ax.plot(age[lab == 0], exp_[lab == 0], "s", ms=4, color=ORANGE, label="$y=0$")
-    ax.set(xlabel="возраст, лет", ylabel="стаж, лет", title="Логистическая регрессия: найти разделяющую прямую")
-    ax.legend(loc="upper left", fontsize=8.5)
     save("00_hooks.png")
 
 
