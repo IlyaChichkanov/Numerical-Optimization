@@ -46,7 +46,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 BLUE, ORANGE, AQUA, RED, GRAY, INK = "#2a78d6", "#eb6834", "#1baf7a", "#e34948", "#8a8985", "#0b0b0b"
-plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.right": False,
+plt.rcParams.update({"figure.dpi": 130, "axes.spines.top": False, "axes.spines.right": False,
                      "axes.grid": True, "grid.alpha": 0.2, "legend.frameon": False})
 
 
@@ -98,7 +98,7 @@ xs, ys = np.linspace(-2, 2, 400), np.linspace(-1, 3, 400)
 X1, X2 = np.meshgrid(xs, ys)
 F_rosen = (1 - X1)**2 + 100 * (X2 - X1**2)**2
 
-fig, ax = plt.subplots(figsize=(5.2, 4.2))
+fig, ax = plt.subplots(figsize=(7, 5.3))
 ax.contour(X1, X2, F_rosen, levels=np.logspace(-1, 3, 12), colors=[GRAY], linewidths=0.7)
 ax.plot(xs, xs**2, ls=":", color=BLUE, lw=1, label="дно долины $x_2=x_1^2$")
 ax.plot(1, 1, "*", ms=14, color=RED, mec="white", label="минимум (1, 1)")
@@ -142,14 +142,14 @@ v_chain = np.linalg.solve(H, -grad_E(np.zeros(2 * N)))
 print(f"энергия на старте (прямая): {energy(v0):.4f},  в минимуме: {energy(v_chain):.4f},  |grad E| в минимуме: {np.linalg.norm(grad_E(v_chain)):.1e}")
 
 y, z = unpack(v_chain)
-plt.figure(figsize=(5.6, 3.2))
+plt.figure(figsize=(7.4, 4.1))
 plt.plot(y, z, "-o", ms=3, color=BLUE, label="минимум энергии")
 plt.plot(*unpack(v0), ls=":", color=GRAY, label="старт: прямая")
 plt.plot([-2, 2], [1, 1], "o", color=INK, ms=7)
 plt.xlabel("$y$"); plt.ylabel("$z$"); plt.legend(loc="upper center", fontsize=8.5); plt.title(f"цепь без пола, $N={N}$")
 plt.show()''')
 
-md(r"""**Задача В. Логистическая регрессия** (лекция 1, §7.5). Синтетические данные: $n=200$ человек, признаки — возраст (лет) и стаж (лет), класс $y\in\{0,1\}$ разыгрывается с вероятностью $\sigma(1.5z_1-z_2+0.3)$ по стандартизованным $z$. Модель: $\Pr(y=1\mid x)=\sigma(w^\top x)$, $x=(1,\text{возраст},\text{стаж})$; цель $f(w)=\frac1n\sum_i\log\big(1+e^{-\tilde y_i\,x_i^\top w}\big)$, $\tilde y_i=2y_i-1\in\{-1,1\}$ — гладкая, выпуклая, без ограничений. Обратите внимание на масштабы признаков: возраст разбросан на $\pm10$, стаж — на $\pm1$. Это выстрелит в части (d).""")
+md(r"""**Задача В. Логистическая регрессия** (лекция 1, §7.5). Синтетические данные: $n=200$ человек, признаки — возраст (лет) и стаж (лет), метка $y$ равна $1$ с вероятностью $\sigma(1.5z_1-z_2+0.3)$ (по стандартизованным $z$) и $0$ иначе. Модель: $\Pr(y=1\mid x)=\sigma(w^\top x)$, $x=(1,\text{возраст},\text{стаж})$; цель $f(w)=\frac1n\sum_i\log\big(1+e^{-\tilde y_i\,x_i^\top w}\big)$, $\tilde y_i=2y_i-1\in\{-1,1\}$ — гладкая, выпуклая, без ограничений. Обратите внимание на масштабы признаков: возраст разбросан на $\pm10$, стаж — на $\pm1$. Это выстрелит в части (d).""")
 
 code(r"""rng = np.random.default_rng(4)          # заново, чтобы ячейку можно было перезапускать: данные должны быть теми же
 n = 200
@@ -162,7 +162,7 @@ X = np.c_[np.ones(n), age, exper]
 print(f"объектов: {n}, класс 1: {int(y_cls.sum())}, класс 0: {int(n - y_cls.sum())}")
 print(f"возраст: среднее {age.mean():.1f}, std {age.std():.1f};   стаж: среднее {exper.mean():.2f}, std {exper.std():.2f}")
 
-plt.figure(figsize=(5.2, 3.6))
+plt.figure(figsize=(7, 4.6))
 plt.scatter(age[y_cls == 1], exper[y_cls == 1], s=14, color=BLUE, label="$y=1$")
 plt.scatter(age[y_cls == 0], exper[y_cls == 0], s=14, color=ORANGE, marker="s", label="$y=0$")
 plt.xlabel("возраст, лет"); plt.ylabel("стаж, лет"); plt.legend(); plt.title("два класса; разделяющую прямую найдём в части (d)")
@@ -173,7 +173,7 @@ md(r"""Итак: три задачи, ни одного ограничения, 
 # ============================================================ (a) стационарные точки и гессиан
 md(r"""## (a) Стационарные точки и гессиан
 
-Разделы 2–3 конспекта, упражнение 12.1. Пример из лекции 2: $f(x)=(x_1^2-1)^2+x_2^2$, $\nabla f=(4x_1(x_1^2-1),\,2x_2)$. Условие первого порядка $\nabla f=0$ даёт три точки: $(0,0)$ и $(\pm1,0)$. Гессиан $\nabla^2f=\operatorname{diag}(12x_1^2-4,\,2)$ — смотрим на его собственные числа: все положительны — строгий минимум, есть отрицательное — седло (не минимум). На картинке — поле $-\nabla f$ (куда пойдёт градиентный спуск): к минимумам стрелки сходятся, от седла вдоль $x_1$ — расходятся.""")
+Разделы 2–3 конспекта, упражнение 12.1. Пример из лекции 2: $f(x)=(x_1^2-1)^2+x_2^2$, $\nabla f=(4x_1(x_1^2-1),\,2x_2)$. Условие первого порядка $\nabla f=0$ даёт три точки: $(0,0)$ и $(\pm1,0)$. Гессиан $\nabla^2f=\operatorname{diag}(12x_1^2-4,\,2)$ — смотрим на его собственные числа: все положительны — строгий минимум, есть отрицательное — седло (не минимум). Ниже два взгляда на одну функцию. На 3D-поверхности видно, что это за точки: две ямы в $(\pm1,0)$ и **перевал** между ними в $(0,0)$ — вдоль $x_2$ подъём, вдоль $x_1$ спуск в обе ямы; перевал и есть седло. На плоской картинке — поле $-\nabla f$ (куда пойдёт градиентный спуск): к минимумам стрелки сходятся, от седла вдоль $x_1$ — расходятся.""")
 
 code(r"""f_a = lambda x: (x[0]**2 - 1)**2 + x[1]**2
 grad_a = lambda x: np.array([4 * x[0] * (x[0]**2 - 1), 2 * x[1]])
@@ -189,13 +189,28 @@ for x0 in ([0.0, 0.5], [0.01, 0.5]):
     x, k, _ = gd(f_a, grad_a, x0)
     print(f"GD из {x0}: пришёл в {x.round(6)} за {k} итераций")
 
+Xs, Ys = np.meshgrid(np.linspace(-1.6, 1.6, 160), np.linspace(-1.0, 1.0, 160))
+Zs = (Xs**2 - 1)**2 + Ys**2
+fig = plt.figure(figsize=(8.6, 5))
+ax = fig.add_subplot(projection="3d")
+ax.computed_zorder = False
+ax.plot_surface(Xs, Ys, Zs, cmap="Blues_r", alpha=0.75, rcount=80, ccount=80, linewidth=0)
+ax.contour(Xs, Ys, Zs, levels=[0.05, 0.3, 1.0, 2.0], colors=GRAY, linewidths=0.6, offset=0)
+for px, py, c, lbl in ((1, 0, RED, "минимумы $(\\pm1,0)$"), (-1, 0, RED, None), (0, 0, ORANGE, "седло (перевал)")):
+    ax.scatter([px], [py], [(px**2 - 1)**2 + py**2 + 0.06], color=c, s=70, depthshade=False, zorder=10, edgecolors="white", linewidths=0.8, label=lbl)
+ax.view_init(elev=28, azim=-65)
+ax.set_xticks([-1, 0, 1]); ax.set_yticks([-1, 0, 1]); ax.set_zticks([0, 1, 2, 3])
+ax.set(xlabel="$x_1$", ylabel="$x_2$", zlabel="$f$", title="две ямы и перевал между ними")
+ax.legend(loc="upper right", fontsize=9)
+plt.show()
+
 xs = np.linspace(-1.7, 1.7, 300); ys = np.linspace(-1.1, 1.1, 300)
 X1, X2 = np.meshgrid(xs, ys)
 Fa = (X1**2 - 1)**2 + X2**2
 qx, qy = np.meshgrid(np.arange(-1.6, 1.61, 0.2), np.arange(-1.0, 1.01, 0.2))
 U, V = -4 * qx * (qx**2 - 1), -2 * qy
 nrm = np.hypot(U, V) + 1e-12
-fig, ax = plt.subplots(figsize=(6, 4))
+fig, ax = plt.subplots(figsize=(7.6, 4.9))
 ax.contour(X1, X2, Fa, levels=[0.02, 0.1, 0.3, 0.6, 1, 1.5, 2.5, 4], colors=[GRAY], linewidths=0.7)
 ax.quiver(qx, qy, U / nrm, V / nrm, color=BLUE, alpha=0.6, scale=30, width=0.003)
 ax.plot([1, -1], [0, 0], "*", ms=14, color=RED, mec="white", ls="none", label="минимумы $(\pm1,0)$")
@@ -284,7 +299,7 @@ for a, label in ((0.02, "1/κ"), (0.039, ""), (2 / (kappa + 1), "2/(κ+1), лу�
 
 md(r"""**Зигзаг.** Первые 15 итераций на линиях уровня (эллипсы с полуосями $1:\sqrt\kappa$). При точном шаге соседние градиенты ортогональны (упражнение 12.8в), и путь «отскакивает» от стенок долины; при $\kappa=50$ шаги видны только у самого дна. Постоянный шаг $1/\kappa$ пунктиром: после первого шага $x_2=0$, дальше метод ползёт вдоль дна.""")
 
-code(r"""fig, axes = plt.subplots(1, 2, figsize=(11, 3.6))
+code(r"""fig, axes = plt.subplots(1, 2, figsize=(12, 4.0))
 for ax, kappa in zip(axes, (2, 50)):
     pe, pc = paths_exact[kappa][:16], paths_const[kappa][:16]
     xs = np.linspace(-0.2 * kappa, 1.1 * kappa, 300); ys = np.linspace(-1.3, 1.3, 300)
@@ -377,7 +392,7 @@ print("для сравнения из других стартов:", ", ".join(f
 
 md(r"""**Две картинки.** Слева — пути на линиях уровня: GD (первые 40 точек целиком, дальше каждая 200-я) за пару итераций падает на дно левой ветви долины, а на 30-й backtracking принимает большой шаг $\alpha=0.5$ (условие Армихо выполнено: $f$ упала с $3.94$ до $2.28$) и точка перелетает через горб на правую ветвь, в $(0.87,0.90)$ над дном долины — и дальше 13 700 мелких шагов $2^{-9}$ (изредка $2^{-8}$) ползёт по дну к $(1,1)$; Ньютон делает 7 больших шагов, второй из них уводит в $(0.76,-3.18)$ — за нижний край картинки (ось $x_2$ обрезана, чтобы эта точка не растягивала масштаб; она подписана). Справа — $\log_{10}\|e_k\|$: у GD прямая (линейная сходимость, ошибка умножается на постоянный множитель), у Ньютона — обрыв (квадратичная: наклон растёт с каждым шагом). Оси $k$ разные: GD показан на первых 2000 итерациях, Ньютон — на всех 7.""")
 
-code(r"""fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(13, 3.8), gridspec_kw={"width_ratios": [1.3, 1, 1]})
+code(r"""fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(13.5, 4.0), gridspec_kw={"width_ratios": [1.3, 1, 1]})
 ax1.contour(X1_r := np.linspace(-2, 2, 400)[None, :] * np.ones((400, 1)), X2_r := np.linspace(-1, 3, 400)[:, None] * np.ones((1, 400)),
             (1 - X1_r)**2 + 100 * (X2_r - X1_r**2)**2, levels=np.logspace(-1, 3, 12), colors=[GRAY], linewidths=0.6)
 gd_pts = np.r_[path_bt[:40], path_bt[40::200]]        # первые 40 точек целиком (спуск на дно), дальше каждая 200-я
@@ -465,7 +480,7 @@ print(f"точность классификации на обучающих да
 
 md(r"""**Картинка.** Слева — данные и разделяющая прямая $w^\top x=0$ в исходных координатах. Справа — $\|\nabla f(w_k)\|$ по итерациям для трёх запусков GD: со стандартизацией норма градиента падает с $0.32$ до $10^{-6}$ за 195 итераций; при одном масштабировании — за несколько тысяч; на исходных признаках за 20 000 итераций — примерно на три порядка из семи нужных.""")
 
-code(r"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 3.7))
+code(r"""fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.1))
 ax1.scatter(age[y_cls == 1], exper[y_cls == 1], s=14, color=BLUE, label="$y=1$")
 ax1.scatter(age[y_cls == 0], exper[y_cls == 0], s=14, color=ORANGE, marker="s", label="$y=0$")
 aa = np.linspace(age.min(), age.max(), 2)
@@ -487,7 +502,7 @@ md(r"""Вывод: $\kappa$ здесь определяется не задач�
 # ============================================================ (e) цепь
 md(r"""## (e) Цепь: $\kappa$ растёт с числом грузов
 
-Раздел 5 конспекта, упражнение 12.9. Гессиан энергии — $\operatorname{diag}(DK,DK)$, поэтому $\kappa(\nabla^2E)=\kappa(K)$, а собственные числа $K$ известны: $2-2\cos\frac{j\pi}{N+1}$, откуда $\kappa\approx\big(\tfrac{2(N+1)}{\pi}\big)^2$. Проверяем таблицей для $N=10,20,40,80$: должны увидеть $48.4,\ 178.1,\ 680.6,\ 2658.4$ против формулы $49.0,\ 178.7,\ 681.3,\ 2659.1$ — $\kappa$ растёт как $N^2$. Чем мельче дробим цепь, тем хуже обусловлена задача.""")
+Раздел 5 конспекта, упражнение 12.11. Гессиан энергии — $\operatorname{diag}(DK,DK)$, поэтому $\kappa(\nabla^2E)=\kappa(K)$, а собственные числа $K$ известны: $2-2\cos\frac{j\pi}{N+1}$, откуда $\kappa\approx\big(\tfrac{2(N+1)}{\pi}\big)^2$. Проверяем таблицей для $N=10,20,40,80$: должны увидеть $48.4,\ 178.1,\ 680.6,\ 2658.4$ против формулы $49.0,\ 178.7,\ 681.3,\ 2659.1$ — $\kappa$ растёт как $N^2$. Чем мельче дробим цепь, тем хуже обусловлена задача.""")
 
 code(r"""print(" N   κ(K)      (2(N+1)/π)^2    λ_max(H)=L")
 for N_ in (10, 20, 40, 80):
@@ -523,7 +538,7 @@ for N_ in Ns:
           + ("  (упёрлись в maxit)" if k_ >= 60_000 else ""))
 kappas, iters = np.array(kappas), np.array(iters)
 
-plt.figure(figsize=(5.2, 3.4))
+plt.figure(figsize=(7, 4.3))
 plt.plot(Ns, iters, "o-", color=BLUE, label="итераций GD, шаг $1/L$")
 plt.plot(Ns, iters[2] * kappas / kappas[2], "--", color=GRAY, label="$\\propto\\kappa(N)$")
 plt.xlabel("$N$ (число грузов)"); plt.ylabel("итераций"); plt.legend(); plt.title("цепь: число итераций растёт как $\\kappa\\sim N^2$")

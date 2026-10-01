@@ -29,49 +29,13 @@ md(r"""# Лекция 4. Разбор упражнений
 
 Упражнения из раздела 12 конспекта [`lecture04.md`](lecture04.md). Формат одинаковый: условие и его суть → разбор по пунктам → проверка кодом, по одной идее на ячейку.
 
-На семинаре у доски: 12.1, 12.3, 12.4, 12.7, 12.5 — в этом порядке. Дома: 12.2, 12.6, 12.8, 12.9, 12.10. Сначала попробуйте решить сами; краткие ответы без кода — [`exercises04.md`](exercises04.md).
+На семинаре у доски: разминка 12.0(б),(в), затем 12.1, 12.9 (цепь аналитически — центр семинара), 12.7, 12.5. Дома: остаток 12.0, 12.2, 12.3, 12.4, 12.6, 12.8, 12.10, 12.11. Сначала попробуйте решить сами; краткие ответы без кода — [`exercises04.md`](exercises04.md).
 
-В проверках используются две функции из демо: `gd` — градиентный спуск (постоянный шаг или backtracking) и `newton` — чистый метод Ньютона без линейного поиска.""")
+В проверках используются две функции из демо: `gd` — градиентный спуск (постоянный шаг или backtracking) и `newton` — чистый метод Ньютона. Их код — в файле [`l4helpers.py`](l4helpers.py), который подключает первая ячейка.""")
 
-code('''%matplotlib inline
+code("""%matplotlib inline
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.special import expit
-
-BLUE, ORANGE, AQUA, RED, GRAY, INK = "#2a78d6", "#eb6834", "#1baf7a", "#e34948", "#8a8985", "#0b0b0b"
-plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.right": False,
-                     "axes.grid": True, "grid.alpha": 0.2, "legend.frameon": False})
-
-
-def gd(f, grad, x0, alpha=None, tol=1e-6, maxit=100_000, c=1e-4):
-    """Градиентный спуск. alpha=None — backtracking: с 1 делим пополам, пока f не
-    уменьшится хотя бы на c*alpha*|grad|^2. Иначе — постоянный шаг alpha.
-    Возвращает (x, число итераций, путь)."""
-    x = np.asarray(x0, float).copy(); path = [x.copy()]
-    for k in range(maxit):
-        g = grad(x)
-        if np.linalg.norm(g) <= tol:
-            return x, k, np.array(path)
-        if alpha is None:
-            a, fx = 1.0, f(x)
-            while f(x - a * g) > fx - c * a * (g @ g):
-                a /= 2
-        else:
-            a = alpha
-        x = x - a * g; path.append(x.copy())
-    return x, maxit, np.array(path)
-
-
-def newton(grad, hess, x0, tol=1e-10, maxit=50):
-    """Чистый метод Ньютона без линейного поиска. Возвращает (x, число итераций, путь)."""
-    x = np.asarray(x0, float).copy(); path = [x.copy()]
-    for k in range(maxit):
-        g = grad(x)
-        if np.linalg.norm(g) <= tol:
-            return x, k, np.array(path)
-        x = x - np.linalg.solve(hess(x), g); path.append(x.copy())
-    return x, maxit, np.array(path)''')
+from l4helpers import *  # палитра, настройки matplotlib, функции gd и newton (см. файл рядом)""")
 
 # ============================================================ 12.0
 md(r"""## 12.0. Разминка — счёт руками
@@ -134,7 +98,7 @@ for p in ([0.0, 0.0], [1.0, 0.0], [-1.0, 0.0]):
     kind = "минимум" if lam.min() > 0 else ("максимум" if lam.max() < 0 else "седло")
     print(f"x = {p}: grad = {g1(p)}, lambda = {lam} -> {kind}")''')
 
-code('''# (в): два старта на расстоянии 0.01 — две судьбы
+code('''# (в): два старта на расстоянии 0.01 — два разных исхода
 xa, ka, pa = gd(f1, g1, [0.0, 0.5])
 xb, kb, pb = gd(f1, g1, [0.01, 0.5])
 print(f"из (0, 0.5):    пришли в {xa.round(6)} за {ka} итераций — седло")
@@ -143,20 +107,20 @@ assert np.allclose(xa, [0, 0], atol=1e-6) and np.allclose(xb, [1, 0], atol=1e-5)
 
 code('''xx, yy = np.meshgrid(np.linspace(-1.6, 1.6, 300), np.linspace(-0.8, 0.8, 200))
 zz = (xx ** 2 - 1) ** 2 + yy ** 2
-fig, ax = plt.subplots(figsize=(6.2, 3.4))
+fig, ax = plt.subplots(figsize=(7.8, 4.2))
 ax.contour(xx, yy, zz, levels=np.r_[0.02, 0.1, 0.3, 0.6, 1.0, 1.5, 2.5], colors=GRAY, linewidths=0.8)
 ax.plot(pa[:, 0], pa[:, 1], "-o", ms=4, color=BLUE, label="из $(0,\\,0.5)$: к седлу")
 ax.plot(pb[:, 0], pb[:, 1], "-o", ms=4, color=ORANGE, label="из $(0.01,\\,0.5)$: к минимуму")
 ax.plot([1, -1], [0, 0], "*", ms=13, color=RED, mec="white", ls="none", label="минимумы")
 ax.plot([0], [0], "s", ms=8, color=INK, ls="none", label="седло")
 ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_aspect("equal")
-ax.legend(loc="upper right", fontsize=8); ax.set_title("12.1: два старта — две судьбы", fontsize=10)
+ax.legend(loc="upper right", fontsize=8); ax.set_title("12.1: два старта — два исхода", fontsize=10)
 plt.show()''')
 
 # ============================================================ 12.2
 md(r"""## 12.2. Зазор между необходимым и достаточным
 
-> (а) $x^4$, $x^3$, $-x^4$ в нуле: что говорят условия и что на самом деле? (б) $f=x_1^2+x_2^4$ и $g=x_1^2-x_2^4$: гессианы в нуле одинаковы. А судьбы? (в) Пеано, $f=(x_2-x_1^2)(x_2-2x_1^2)$: проверьте $\nabla f(0)=0$, $\nabla^2f(0)=\operatorname{diag}(0,2)$. (г) Покажите: на каждой прямой через нуль — строгий минимум. (д) Найдите $f<0$ сколь угодно близко к нулю.
+> (а) $x^4$, $x^3$, $-x^4$ в нуле: что говорят условия и что на самом деле? (б) $f=x_1^2+x_2^4$ и $g=x_1^2-x_2^4$: гессианы в нуле одинаковы, а поведение разное. Почему? (в) Пеано, $f=(x_2-x_1^2)(x_2-2x_1^2)$: проверьте $\nabla f(0)=0$, $\nabla^2f(0)=\operatorname{diag}(0,2)$. (г) Покажите: на каждой прямой через нуль — строгий минимум. (д) Найдите $f<0$ сколь угодно близко к нулю.
 >
 > *Суть: при нулевом собственном числе гессиана условия второго порядка молчат — решают старшие члены.*
 
@@ -185,7 +149,7 @@ assert all(fp(x1, 1.5 * x1 ** 2) < 0 for x1 in (0.1, 0.01, 0.001))''')
 
 code('''xx, yy = np.meshgrid(np.linspace(-0.6, 0.6, 400), np.linspace(-0.15, 0.6, 400))
 zz = (yy - xx ** 2) * (yy - 2 * xx ** 2)
-fig, ax = plt.subplots(figsize=(6, 3.6))
+fig, ax = plt.subplots(figsize=(7.6, 4.4))
 ax.contourf(xx, yy, zz, levels=[zz.min(), 0], colors=[RED], alpha=0.25)
 ax.contour(xx, yy, zz, levels=np.r_[0.003, 0.01, 0.03, 0.08, 0.15], colors=GRAY, linewidths=0.8)
 xs = np.linspace(-0.6, 0.6, 200)
@@ -263,7 +227,7 @@ print(f"alpha = 0.041 > 2/kappa: через 2000 итераций |x2| = {abs(p_
 
 code('''# (в): оба множителя как функции alpha
 al = np.linspace(0, 2.4 / kappa, 500)
-fig, ax = plt.subplots(figsize=(6.2, 3.3))
+fig, ax = plt.subplots(figsize=(7.8, 4.1))
 ax.plot(al, np.abs(1 - al), color=BLUE, label="$|1-\\\\alpha|$ (пологое направление)")
 ax.plot(al, np.abs(1 - al * kappa), color=ORANGE, label="$|1-\\\\alpha\\\\kappa|$ (жёсткое направление)")
 ax.axhline(1, color=GRAY, ls="--", lw=1)
@@ -278,7 +242,7 @@ ax.set_xlabel("$\\\\alpha$"); ax.set_ylabel("множитель за итера�
 ax.set_title("12.3(в): лучший шаг — где ломаные пересекаются", fontsize=9.5)
 plt.show()''')
 
-code('''fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.4))
+code('''fig, axs = plt.subplots(1, 2, figsize=(11, 4.0))
 xx, yy = np.meshgrid(np.linspace(-5, 55, 300), np.linspace(-2, 2, 200))
 zz = 0.5 * (xx ** 2 + kappa * yy ** 2)
 for ax, p, title in ((axs[0], p_const, "постоянный шаг $\\\\alpha=1/\\\\kappa$: прыжок и долгое ползание"),
@@ -401,7 +365,7 @@ _, kn, pn = newton(gn_, hn, np.full(10, 0.9), tol=1e-8)
 gnn = np.array([np.linalg.norm(gn_(q_)) for q_ in pn])
 print(f"Ньютон: {kn} итераций, ||grad f_k|| = {np.array2string(gnn, precision=2)} — цифры удваиваются")''')
 
-code('''fig, axs = plt.subplots(1, 2, figsize=(9.5, 3.3))
+code('''fig, axs = plt.subplots(1, 2, figsize=(11, 3.9))
 ax = axs[0]
 ax.plot(np.arange(len(lg5)), lg5, color=BLUE, lw=1.5, label="GD, шаг $1/L$, $\\\\kappa=1090$")
 ax.plot([0, 20000], [0, -8], "--", color=GRAY, lw=1, label="прямая из условия: наклон $-0.0004$")
@@ -458,7 +422,7 @@ x = np.array([-1.2, 1.0]); g = gr(x); L_loc = np.linalg.eigvalsh(hr(x))[-1]
 alphas = np.linspace(0, 2.4 / L, 300)
 actual = np.array([fr(x) - fr(x - a * g) for a in alphas])
 guaranteed = alphas * (1 - alphas * L / 2) * (g @ g)
-fig, ax = plt.subplots(figsize=(6, 3.2))
+fig, ax = plt.subplots(figsize=(7.6, 4.0))
 ax.plot(alphas * L, actual, color=BLUE, label="фактическое $f(x)-f(x-\\\\alpha\\\\nabla f)$")
 ax.plot(alphas * L, guaranteed, color=ORANGE, label="гарантия леммы $\\\\alpha(1-\\\\alpha L/2)\\\\|\\\\nabla f\\\\|^2$")
 ax.axvline(1, color=GRAY, ls="--", lw=1); ax.axvline(2, color=GRAY, ls="--", lw=1)
@@ -524,27 +488,37 @@ cos = [gs[k] @ gs[k + 1] / (np.linalg.norm(gs[k]) * np.linalg.norm(gs[k + 1])) f
 print("(в) cos между соседними градиентами при точном шаге:", np.round(cos, 12))''')
 
 # ============================================================ 12.9
-md(r"""## 12.9. Цепь: $\kappa$ растёт с числом грузов
+md(r"""## 12.9. Цепь: решаем аналитически
 
-> (а) Покажите $\nabla^2E=\operatorname{diag}(DK,\,DK)$ с трёхдиагональной $K$. (б) По $\lambda_j=2-2\cos\frac{j\pi}{N+1}$ найдите $\kappa(N)$ и покажите $\kappa\approx(2(N+1)/\pi)^2$. (в) $N=40$: итераций спуска и шагов Ньютона? (г) Почему Ньютон — это `np.linalg.solve`?
+> Цепь без пола: $N$ грузов массой $m=4/N$ на пружинах жёсткости $D$ между $(-2,1)$ и $(2,1)$, $E=\tfrac D2\sum_{i=0}^N\big[(y_{i+1}-y_i)^2+(z_{i+1}-z_i)^2\big]+mg\sum_{i=1}^N z_i$. (а) $N=1$ руками. (б) $N=2$. (в) Общий $N$: почему $\nabla E=0$ — линейная система? (г) Грузы по $y$ равномерны. (д) Проверьте формулу $z_i=1-\frac{mg}{2D}\,i\,(N+1-i)$. (е) Почему это `np.linalg.solve` и один шаг Ньютона?
 >
-> *Суть: чем мельче дробим задачу, тем хуже она обусловлена — $\kappa\sim N^2$.*
+> *Суть: минимум энергии находится руками — условие $\nabla E=0$ линейно, и у решения есть явная формула.*
 
-**(а)** Координата $y_i$ входит ровно в две пружины, $(y_i-y_{i-1})^2$ и $(y_{i+1}-y_i)^2$, поэтому
-$$\frac{\partial E}{\partial y_i}=D\,(2y_i-y_{i-1}-y_{i+1}),\qquad \frac{\partial^2E}{\partial y_i^2}=2D,\qquad \frac{\partial^2E}{\partial y_i\,\partial y_{i\pm1}}=-D.$$
-Это матрица $DK$ с трёхдиагональной $K$. По $z$ то же самое: вес $mg\sum z_i$ линеен и вторых производных не даёт. Членов $y_iz_j$ в энергии нет, так что $\nabla^2E=\operatorname{diag}(DK,\,DK)$ — постоянная матрица: $E$ квадратична.
+**(а) Один груз.** Две пружины и вес:
+$$E(y,z)=\tfrac D2\big[(y+2)^2+(z-1)^2\big]+\tfrac D2\big[(2-y)^2+(1-z)^2\big]+mgz.$$
+Приравниваем производные к нулю:
+$$\frac{\partial E}{\partial y}=D\big[(y+2)-(2-y)\big]=2Dy=0\ \Rightarrow\ y=0;\qquad
+\frac{\partial E}{\partial z}=2D(z-1)+mg=0\ \Rightarrow\ z=1-\frac{mg}{2D}.$$
+Груз висит посередине и провисает на $mg/(2D)$: при $m=4$, $D=70$ это $39.24/140\approx0.28$, то есть $z\approx0.72$.
 
-**(б)** $\lambda_{\min}(K)=2-2\cos\frac\pi{N+1}$, а $\lambda_{\max}(K)=2+2\cos\frac\pi{N+1}$ (у $j=N$ косинус поменял знак). Общий множитель $D$ сокращается:
-$$\kappa(N)=\frac{1+\cos\frac\pi{N+1}}{1-\cos\frac\pi{N+1}}.$$
-При больших $N$ угол $\theta=\pi/(N+1)$ мал, $\cos\theta\approx1-\theta^2/2$: числитель $\approx2$, знаменатель $\approx\theta^2/2$, и
-$$\kappa\approx\frac4{\theta^2}=\Big(\frac{2(N+1)}\pi\Big)^2\ \sim\ N^2.$$
-Для $N=10,20,40,80$: $\kappa=48.4,\ 178.1,\ 680.6,\ 2658.4$; формула даёт $49.0,\ 178.7,\ 681.3,\ 2659.1$.
+**(б) Два груза** ($m=2$). По $y$ система $2y_1-y_2=-2$, $-y_1+2y_2=2$: решение $y=(-\tfrac23,\ \tfrac23)$ — грузы делят отрезок на три равные части. По $z$: $2z_1-z_2=1-\tfrac{mg}D$, $-z_1+2z_2=1-\tfrac{mg}D$; система симметрична, $z_1=z_2=1-\tfrac{mg}D\approx0.72$.
 
-**(в)** $N=40$: $\kappa\approx681$, $L=D\,\lambda_{\max}(K)\approx279.6$. Стартовый градиент $\|\nabla E(v_0)\|\approx6.2$, стоп по $10^{-6}$ — уменьшить в $6.2\cdot10^6$ раз: оценка $\kappa\ln(6.2\cdot10^6)\approx10\,640$ итераций, факт — $10\,575$. Функция квадратична, и асимптотика работает с первого шага. Ньютону нужен **один** шаг.
+**(в) Общий $N$.** Координата $y_i$ входит ровно в две пружины, поэтому
+$$\frac{\partial E}{\partial y_i}=D\,(2y_i-y_{i-1}-y_{i+1})=0,\qquad
+\frac{\partial E}{\partial z_i}=D\,(2z_i-z_{i-1}-z_{i+1})+mg=0,$$
+где $y_0=-2$, $y_{N+1}=2$, $z_0=z_{N+1}=1$. Каждое уравнение **линейно** по неизвестным — потому что $E$ квадратична: её градиент имеет вид $Hv+b$, и $\nabla E=0$ — система $Hv=-b$.
 
-**(г)** Для квадратичной $E$ квадратичная модель Ньютона — тождество, и его шаг из любой точки решает $\nabla E=Hv+b=0$. Это линейная система: `np.linalg.solve(H, -grad(0))`. Минимальная энергия $E^\ast=13.4417$.""")
+**(г) Горизонталь.** $2y_i=y_{i-1}+y_{i+1}$ значит: каждый $y_i$ — среднее соседей, вторая разность нулевая, $y$ — арифметическая прогрессия от $-2$ до $2$:
+$$y_i=-2+\frac{4i}{N+1}$$
+— грузы по горизонтали расставлены **равномерно**. По горизонтали ничто не тянет вбок.
 
-code('''# (а)-(б): гессиан собирается из K, kappa растёт как N^2
+**(д) Вертикаль.** Подставим $z_i=1-a\,s_i$, где $s_i=i(N+1-i)$, $a=\tfrac{mg}{2D}$. Краевые условия выполнены: $s_0=s_{N+1}=0$. Считаем вторую разность $s$:
+$$2s_i-s_{i-1}-s_{i+1}=2i(N+1-i)-(i-1)(N+2-i)-(i+1)(N-i)=2,$$
+поэтому $2z_i-z_{i-1}-z_{i+1}=-2a=-\tfrac{mg}D$ — ровно уравнение из (в). Итак, цепь провисает по **дискретной параболе** $s_i=i(N+1-i)$; глубина в середине $\approx\tfrac{mg(N+1)^2}{8D}$, при $N=40$ это $\approx2.94$ — цепь висит до $z\approx-1.94$.
+
+**(е)** Система (в) — это $Hv=-b$, где $b=\nabla E(0)$: её решает `np.linalg.solve(H, -grad_E(0))`. А для квадратичной $E$ ровно это делает один шаг Ньютона из любого старта (демо, части (0) и (e)): квадратичная модель точна, и шаг попадает в минимум сразу.""")
+
+code("""# (г)-(д): формулы против np.linalg.solve
 D, g_acc = 70.0, 9.81
 p_left, p_right = np.array([-2.0, 1.0]), np.array([2.0, 1.0])
 
@@ -560,39 +534,34 @@ def make_chain(N):
         return np.r_[D * (2 * y[1:-1] - y[:-2] - y[2:]), D * (2 * z[1:-1] - z[:-2] - z[2:]) + m * g_acc]
     K = 2 * np.eye(N) - np.eye(N, k=1) - np.eye(N, k=-1)
     H = np.kron(np.eye(2), D * K)
-    v0 = np.r_[np.linspace(*[p_left[0], p_right[0]], N + 2)[1:-1], np.linspace(*[p_left[1], p_right[1]], N + 2)[1:-1]]
+    v0 = np.r_[np.linspace(p_left[0], p_right[0], N + 2)[1:-1], np.linspace(p_left[1], p_right[1], N + 2)[1:-1]]
     return energy, grad_E, unpack, K, H, v0
 
 N = 40
 energy, grad_E, unpack, K, H, v0 = make_chain(N)
-H_num = np.column_stack([grad_E(e) - grad_E(np.zeros(2 * N)) for e in np.eye(2 * N)])   # градиент линеен — разности точны
-print(f"(а) гессиан = kron(I2, D K): max |H_num - H| = {np.abs(H_num - H).max():.1e}")
+v_solve = np.linalg.solve(H, -grad_E(np.zeros(2 * N)))
 
-print("(б)  N   kappa(K)   (2(N+1)/pi)^2")
-for n in (10, 20, 40, 80):
-    ev = np.linalg.eigvalsh(2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1))
-    print(f"   {n:3d}  {ev[-1] / ev[0]:8.1f}   {(2 * (n + 1) / np.pi) ** 2:10.1f}")''')
+i = np.arange(1, N + 1)
+a = (4.0 / N) * g_acc / (2 * D)
+y_formula = -2 + 4 * i / (N + 1)
+z_formula = 1 - a * i * (N + 1 - i)
+print(f"max |y_формула - y_solve| = {np.abs(y_formula - v_solve[:N]).max():.2e}")
+print(f"max |z_формула - z_solve| = {np.abs(z_formula - v_solve[N:]).max():.2e}")
+print(f"глубина провиса в середине: {1 - z_formula.min():.3f}  (формула mg(N+1)^2/(8D) = {(4.0 / N) * g_acc * (N + 1) ** 2 / (8 * D):.3f})")
+print(f"энергия в минимуме: {energy(v_solve):.4f}")
+assert np.allclose(np.r_[y_formula, z_formula], v_solve, atol=1e-9)
+assert abs(energy(v_solve) - 13.4417) < 5e-4""")
 
-code('''# (в)-(г): спуск против одного шага Ньютона при N = 40
-lamH = np.linalg.eigvalsh(H)
-L, kappa_c = lamH[-1], lamH[-1] / lamH[0]
-gn0 = np.linalg.norm(grad_E(v0))
-print(f"L = {L:.1f}, kappa = {kappa_c:.1f};  ||grad E(v0)|| = {gn0:.2f};  оценка kappa*ln(||grad||/1e-6) = {kappa_c * np.log(gn0 / 1e-6):.0f}")
-
-v_gd, k_gd, _ = gd(energy, grad_E, v0, alpha=1 / L)
-v_newton = v0 - np.linalg.solve(H, grad_E(v0))
-print(f"GD с шагом 1/L: {k_gd} итераций, E = {energy(v_gd):.4f}")
-print(f"один шаг Ньютона: E = {energy(v_newton):.4f}, |grad E| = {np.linalg.norm(grad_E(v_newton)):.1e}, расстояние до GD {np.linalg.norm(v_gd - v_newton):.1e}")
-assert abs(k_gd - 10_575) <= 5 and np.linalg.norm(grad_E(v_newton)) < 1e-9''')
-
-code('''y0, z0 = unpack(v0); y1, z1 = unpack(v_newton)
-fig, ax = plt.subplots(figsize=(5.6, 3.2))
+code("""y0, z0 = unpack(v0); ys, zs = unpack(v_solve)
+fig, ax = plt.subplots(figsize=(7.4, 4.1))
 ax.plot(y0, z0, "--", color=GRAY, label="старт: прямая между концами")
-ax.plot(y1, z1, "-o", ms=3, color=BLUE, label="один шаг Ньютона = np.linalg.solve")
+ax.plot(ys, zs, "o", ms=4, color=BLUE, label="np.linalg.solve (= шаг Ньютона)")
+ax.plot(np.r_[-2, y_formula, 2], np.r_[1, z_formula, 1], "-", color=ORANGE, lw=1.4,
+        label="формула: $z_i=1-\\\\frac{mg}{2D}i(N+1-i)$")
 ax.plot([-2, 2], [1, 1], "o", color=INK, ms=7)
 ax.set_xlabel("$y$"); ax.set_ylabel("$z$"); ax.legend(fontsize=8.5, loc="center")
-ax.set_title(f"12.9: цепь $N={N}$, $E^*={energy(v_newton):.4f}$, $\\\\kappa={kappa_c:.0f}$", fontsize=10)
-plt.show()''')
+ax.set_title(f"12.9: цепь $N={N}$ — дискретная парабола, $E^*={energy(v_solve):.4f}$", fontsize=10)
+plt.show()""")
 
 # ============================================================ 12.10
 md(r"""## 12.10. Логистическая регрессия: гессиан и сдвиг
@@ -616,6 +585,8 @@ $$\cos\angle(a,\mathbf1)=\frac{\bar a}{\sqrt{\bar a^2+\operatorname{var}a}}=\fra
 **(г)** Масштабирование делит столбец на число — угол со столбцом единиц не меняется, коллинеарность остаётся: $\kappa$ падает лишь до $\sim2\cdot10^3$. Стандартизация ещё и вычитает среднее — столбцы признаков становятся **ортогональны** единицам ($\sum_i(x_{ij}-\mu_j)=0$), и $\kappa\approx2.75$. Это аффинная замена переменных: задача та же, ответ пересчитывается, а спуск сходится за $195$ итераций вместо «не сходится за $20\,000$». Ньютону всё равно: $6$ итераций в любом варианте.""")
 
 code('''# (а)-(б): формулы и проверка градиента конечными разностями
+from scipy.special import expit
+
 f_log = lambda w, X, y: np.mean(np.logaddexp(0, -y * (X @ w)))
 g_log = lambda w, X, y: -X.T @ (expit(-y * (X @ w)) * y) / len(y)
 h_log = lambda w, X, y: (X.T * (expit(X @ w) * (1 - expit(X @ w)))) @ X / len(y)
@@ -647,17 +618,47 @@ for name, XX in (("сырые признаки", X), ("только масшта
     print(f"(г) {name}: cos(возраст, 1) = {cosang(XX[:, 1], XX[:, 0]):.2f}, kappa = {ev[-1] / ev[0]:.3g};  GD {k_gd} ит.{tail}, Ньютон {k_new} ит.")
 print(f"точность классификации: {np.mean((Xs @ w_star > 0) == (y > 0)):.3f}")''')
 
+# ============================================================ 12.11
+md(r"""## 12.11. Цепь: $\kappa$ растёт с числом грузов
+
+> Продолжение 12.9: гессиан $\operatorname{diag}(DK,\,DK)$ там уже выписан. (а) По $\lambda_j(K)=2-2\cos\frac{j\pi}{N+1}$ найдите $\kappa(N)$. (б) Покажите $\kappa\approx(2(N+1)/\pi)^2$. (в) $N=40$: итераций спуска против одного шага Ньютона.
+>
+> *Суть: чем мельче дробим задачу, тем хуже она обусловлена — $\kappa\sim N^2$.*
+
+**(а)** $\lambda_{\min}(K)=2-2\cos\frac\pi{N+1}$, а $\lambda_{\max}(K)=2+2\cos\frac\pi{N+1}$ (у $j=N$ косинус поменял знак). Общий множитель $D$ сокращается:
+$$\kappa(N)=\frac{1+\cos\frac\pi{N+1}}{1-\cos\frac\pi{N+1}}.$$
+
+**(б)** При больших $N$ угол $\theta=\pi/(N+1)$ мал и $\cos\theta\approx1-\theta^2/2$: числитель $\approx2$, знаменатель $\approx\theta^2/2$, значит
+$$\kappa\approx\frac4{\theta^2}=\Big(\frac{2(N+1)}\pi\Big)^2\ \sim\ N^2.$$
+Для $N=10,20,40,80$: $\kappa=48.4,\ 178.1,\ 680.6,\ 2658.4$; формула даёт $49.0,\ 178.7,\ 681.3,\ 2659.1$.
+
+**(в)** $N=40$: $\kappa\approx681$, $L=D\,\lambda_{\max}(K)\approx279.6$. Стартовый градиент $\|\nabla E(v_0)\|\approx6.2$, стоп по $10^{-6}$ — уменьшить в $6.2\cdot10^6$ раз: оценка $\kappa\ln(6.2\cdot10^6)\approx10\,640$ итераций, факт — $10\,575$: функция квадратична, асимптотика работает с первого шага. Ньютон (12.9(е)) решает ту же задачу одной линейной системой.""")
+
+code("""# (а)-(б): kappa(N) против формулы; (в): спуск против Ньютона
+print(" N   kappa(K)   (2(N+1)/pi)^2")
+for n in (10, 20, 40, 80):
+    ev = np.linalg.eigvalsh(2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1))
+    print(f"{n:3d}  {ev[-1] / ev[0]:9.1f}  {(2 * (n + 1) / np.pi) ** 2:12.1f}")
+
+lamH = np.linalg.eigvalsh(H)
+L, kappa_c = lamH[-1], lamH[-1] / lamH[0]
+gn0 = np.linalg.norm(grad_E(v0))
+v_gd, k_gd, _ = gd(energy, grad_E, v0, alpha=1 / L)
+print(f"N = 40: L = {L:.1f}, kappa = {kappa_c:.1f};  оценка kappa*ln(||grad E(v0)||/1e-6) = {kappa_c * np.log(gn0 / 1e-6):.0f}")
+print(f"GD с шагом 1/L: {k_gd} итераций;  расстояние до решения из 12.9: {np.linalg.norm(v_gd - v_solve):.1e}")
+assert abs(k_gd - 10_575) <= 5""")
+
 # ============================================================ итог
 md(r"""## Что запомнить
 
 - $\nabla f=0$ — необходимое условие: спуск останавливается в любой стационарной точке, в том числе в седле, но к седлу приходит только со множества меры нуль (12.1). Нулевое собственное число гессиана — условия молчат, решают старшие члены; проверка «по направлениям» не заменяет $\nabla^2f\succ0$ (12.2).
-- На квадратичной с постоянным шагом ошибка по каждому собственному направлению сжимается в $|1-\alpha\lambda_i|$ раз; сходимость при $0<\alpha<2/\lambda_{\max}$, лучший шаг $2/(\lambda_{\max}+\lambda_{\min})$ с множителем $(\kappa-1)/(\kappa+1)$; итераций на цифру $\sim\kappa$ (12.3, 12.4, 12.9).
+- На квадратичной с постоянным шагом ошибка по каждому собственному направлению сжимается в $|1-\alpha\lambda_i|$ раз; сходимость при $0<\alpha<2/\lambda_{\max}$, лучший шаг $2/(\lambda_{\max}+\lambda_{\min})$ с множителем $(\kappa-1)/(\kappa+1)$; итераций на цифру $\sim\kappa$ (12.3, 12.4, 12.11).
 - $\kappa$ — свойство координат: масштабирование — самый дешёвый предобусловливатель, а при признаках с большим средним нужна ещё и центровка (12.3(д)–(е), 12.10).
 - Наклон прямой $\log_{10}\|\nabla f_k\|$ равен $\log_{10}(1-1/\kappa)$: по графику читаются $\kappa$ и цена цифры (12.5).
 - Лемма о спуске: при $\nabla^2f\preceq LI$ шаг $1/L$ гарантирует убывание на $\|\nabla f\|^2/(2L)$; для квадратичной $L=\lambda_{\max}$; глобальная $L$ пессимистична, backtracking находит локальную (12.6).
 - Тип сходимости — по отношению соседних ошибок: отделено от единицы — линейная, $\to0$ — сверхлинейная, $\|e_{k+1}\|\le C\|e_k\|^2$ — квадратичная (12.7).
 - Антиградиент — самый крутой спуск и перпендикуляр к линии уровня; при точном шаге соседние градиенты ортогональны — зигзаг (12.8).
-- Для квадратичной функции Ньютон — один шаг, то есть линейная система (12.9); для логистической регрессии — несколько (12.10).""")
+- Минимум квадратичной функции — решение линейной системы $\nabla E=Hv+b=0$: у цепи оно выписывается руками, и это же — один шаг Ньютона (12.9, 12.11); для логистической регрессии Ньютону нужно несколько шагов (12.10).""")
 
 # ============================================================ сборка
 nb = nbf.v4.new_notebook(cells=cells)

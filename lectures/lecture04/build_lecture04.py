@@ -75,16 +75,28 @@ def main() -> None:
     setup, parts = demo_parts()
     text_cells = split_cells(MD.read_text(encoding="utf-8"))
 
+    # вспомогательный код (палитра, gd, newton) — в модуль рядом с ноутбуком
+    helper_body = setup.source.replace("%matplotlib inline\n\n", "", 1)
+    (HERE / "l4helpers.py").write_text(
+        '"""Вспомогательный код демонстраций лекции 4: палитра, настройки matplotlib,\n'
+        'градиентный спуск `gd` и метод Ньютона `newton`.\n\n'
+        'Файл генерируется скриптом build_lecture04.py из build_demo04.py — не правьте руками.\n"""\n\n'
+        + helper_body + "\n",
+        encoding="utf-8",
+    )
+
     out: list[nbf.NotebookNode] = []
     for i, src in enumerate(text_cells):
-        if i == 1:  # после шапки конспекта, перед «## 1.» — импорты и функции gd/newton
+        if i == 1:  # после шапки конспекта, перед «## 1.» — короткая ячейка с импортом
             out.append(nbf.v4.new_markdown_cell(
                 "> **Код в этом ноутбуке.** Демонстрации из [`demo04.ipynb`](demo04.ipynb) вставлены "
-                "в те разделы конспекта, к которым относятся; каждая начинается с заголовка «Демо (…)». "
-                "При чтении их можно пропускать, на лекции — запускать по ходу. Ячейка ниже задаёт "
-                "палитру и две функции, `gd` и `newton`, которыми пользуются все демонстрации."
+                "в те разделы, к которым относятся; заголовки — «Демо (0)»–«Демо (e)». При чтении их "
+                "можно пропускать, на лекции — запускать по ходу. Вспомогательный код (палитра, функции "
+                "`gd` и `newton`) вынесен в [`l4helpers.py`](l4helpers.py); его подключает ячейка ниже."
             ))
-            out.append(nbf.v4.new_code_cell(setup.source))
+            out.append(nbf.v4.new_code_cell(
+                "%matplotlib inline\n\nfrom l4helpers import *  # палитра, настройки matplotlib, gd, newton"
+            ))
         for part, prefix in PLACEMENT:
             if src.startswith(prefix):
                 out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"
