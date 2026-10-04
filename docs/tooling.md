@@ -20,8 +20,9 @@ lectures/lectureNN/
 lectures/extra/             заготовки, отложенные до подходящего места в программе (см. README там);
                             собираются теми же скриптами
 homeworks/hwNN.md, .ipynb   домашние задания: md — краткое описание и правила, ipynb — рабочий шаблон
-homeworks/solutions/        не публикуются в репозитории (студенты учатся по нему); преподаватель ведёт
-                            решения и заметки к лекциям отдельно
+homeworks/solutions/        решения, публикуются после дедлайна задания; build_hwNN.py собирает из
+                            одного описания и шаблон hwNN.ipynb, и hwNN_solution.ipynb (ячейки с полем
+                            solution). До дедлайна ни решение, ни его сборщик в репозиторий не кладутся
 submissions/hwNN/           сданные работы <фамилия>.ipynb — приходят pull request'ами, см. CONTRIBUTING.md
 tools/                      вспомогательные скрипты
 ```
@@ -46,6 +47,8 @@ uv run python tools/md2nb.py lectures/lecture01/lecture01.md   # конспек�
 uv run python lectures/lecture01/build_demo01.py          # demo01.ipynb (без выводов)
 uv run python lectures/lecture01/build_exercises01.py     # exercises01.ipynb (без выводов)
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/demo01.ipynb lectures/lecture01/exercises01.ipynb
+uv run python homeworks/solutions/build_hw01.py                # hw01.ipynb (шаблон) + solutions/hw01_solution.ipynb
+uv run jupyter nbconvert --to notebook --execute --inplace homeworks/solutions/hw01_solution.ipynb
 ```
 
 Начиная с лекции 4 конспект-ноутбук содержит и код демонстраций, поэтому собирается не `md2nb.py`, а своим скриптом, и после сборки выполняется:
