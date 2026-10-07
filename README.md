@@ -21,7 +21,8 @@
 | 2 | 16.09 | Выпуклость: множества, функции, задачи, условие оптимальности | [конспект](lectures/lecture02/lecture02.md) · [демо-ноутбук](lectures/lecture02/demo02.ipynb) · [разбор упражнений](lectures/lecture02/exercises02.ipynb) · [ДЗ 2](homeworks/hw02.md) (выдача 23.09, до 07.10) |
 | 3 | 23.09 | Как учитывать ограничения: геометрия оптимума и множители Лагранжа | [конспект](lectures/lecture03/lecture03.md) · [демо-ноутбук](lectures/lecture03/demo03.ipynb) · [разбор упражнений](lectures/lecture03/exercises03.ipynb) |
 | 4 | 30.09 | Безусловная оптимизация: условия оптимальности, градиентный спуск, число обусловленности | [конспект](lectures/lecture04/lecture04.md) · [конспект-ноутбук с демо](lectures/lecture04/lecture04.ipynb) · [демо-ноутбук](lectures/lecture04/demo04.ipynb) · [семинар (CasADi)](lectures/lecture04/seminar04.ipynb) · [разбор упражнений](lectures/lecture04/exercises04.ipynb) |
-| 5–16 | 07.10 – 23.12 | см. [календарь в программе курса](syllabus.md#3-календарь) | появляются еженедельно |
+| 5 | 07.10 | Метод Ньютона, квази-ньютоновские методы (BFGS, L-BFGS), Гаусс–Ньютон, локальная сходимость | [конспект](lectures/lecture05/lecture05.md) · [конспект-ноутбук с демо](lectures/lecture05/lecture05.ipynb) · [демо-ноутбук](lectures/lecture05/demo05.ipynb) · [семинар](lectures/lecture05/seminar05.ipynb) · [разбор упражнений](lectures/lecture05/exercises05.ipynb) · [ДЗ 3](homeworks/hw03.md) (до 21.10) |
+| 6–16 | 14.10 – 23.12 | см. [календарь в программе курса](syllabus.md#3-календарь) | появляются еженедельно |
 
 [Программа курса](syllabus.md): цели, календарь, домашние задания, проект, оценивание, литература.
 

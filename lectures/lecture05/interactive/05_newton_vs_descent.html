@@ -1,0 +1,362 @@
+<title>Ньютон против спуска</title>
+<style>
+/* Макет: одна колонка до 900 px; каждая сцена — холст слева, панель управления и табло справа, на телефоне в столбик. */
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --fg: #1d1d1b; --muted: #6f6e69; --line: #d9d7cf;
+  --blue: #2a78d6; --orange: #eb6834; --aqua: #1baf7a; --red: #e34948; --violet: #4a3aa7; --gray: #8a8985;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #16171a; --panel: #1f2126; --fg: #ececea; --muted: #a2a19b; --line: #34363c; --gray: #9c9b96; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #16171a; --panel: #1f2126; --fg: #ececea; --muted: #a2a19b; --line: #34363c; --gray: #9c9b96; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 900px; margin: 0 auto; padding-block: 18px 40px; padding-inline: 16px; }
+h1 { font-size: 1.45rem; margin: 0 0 4px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0 0 14px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font: inherit; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.scene { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 680px) { .scene { grid-template-columns: 1fr; } }
+canvas { width: 100%; height: auto; display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; touch-action: manipulation; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel h2 { font-size: 1rem; margin: 0; }
+.what { color: var(--muted); font-size: 0.92rem; margin: 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row label { font-size: 0.9rem; color: var(--muted); }
+select, input[type=range] { font: inherit; }
+select { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+input[type=range] { flex: 1 1 120px; min-width: 0; accent-color: var(--blue); }
+.btn { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.btn:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+table.board { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+table.board td { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+table.board td:last-child { text-align: right; font-family: var(--font-mono); }
+.expect { font-size: 0.86rem; color: var(--muted); }
+.hint { font-size: 0.86rem; color: var(--muted); margin: 10px 0 0; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+.formula { font-family: var(--font-mono); font-size: 0.9rem; background: var(--bg); border-radius: 4px; padding: 6px 8px; }
+small.src { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <h1>Ньютон против спуска</h1>
+  <p class="sub">Лекция 5 курса «Вычислительная оптимизация»: квадратичная модель, её шаг и места, где она врёт. Числа на табло совпадают с конспектом: тот же код методов, те же допуски.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="s1" id="tab-s1">1. Ньютон против спуска</button>
+    <button role="tab" aria-selected="false" data-tab="s2" id="tab-s2">2. Бассейны Ньютона</button>
+    <button role="tab" aria-selected="false" data-tab="s3" id="tab-s3">3. Парабола едет</button>
+  </div>
+
+  <!-- ===================== сцена 1 ===================== -->
+  <section id="s1" class="scene" role="tabpanel">
+    <div>
+      <canvas id="c1" width="560" height="470" aria-label="линии уровня Розенброка и путь метода"></canvas>
+      <div class="legend"><span style="--c: var(--blue)">спуск, backtracking</span><span style="--c: var(--orange)">чистый Ньютон</span><span style="--c: var(--violet)">Ньютон с backtracking</span><span style="--c: var(--aqua)">BFGS</span></div>
+      <canvas id="c1e" width="560" height="220" aria-label="логарифм ошибки по итерациям"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Розенброк: f = (1−x₁)² + 100(x₂−x₁²)²</h2>
+      <p class="what">Что увидеть: спуск ползёт по дну долины тысячами шагов, Ньютон делает семь — и один из них улетает за край; BFGS между ними.</p>
+      <div class="row"><label for="m1">Метод</label>
+        <select id="m1">
+          <option value="gd">спуск, backtracking (tol 10⁻⁶)</option>
+          <option value="newton" selected>чистый Ньютон (tol 10⁻¹⁰)</option>
+          <option value="damped">Ньютон с backtracking (tol 10⁻¹⁰)</option>
+          <option value="bfgs">BFGS (tol 10⁻⁶)</option>
+        </select></div>
+      <div class="row"><button class="btn primary" id="step1">шаг →</button><button class="btn" id="run1">запустить</button><button class="btn" id="reset1">сброс</button></div>
+      <table class="board">
+        <tr><td>старт</td><td id="b1start">(−1.20, 1.00)</td></tr>
+        <tr><td>итерация k</td><td id="b1k">0</td></tr>
+        <tr><td>x_k</td><td id="b1x">—</td></tr>
+        <tr><td>‖∇f‖</td><td id="b1g">—</td></tr>
+        <tr><td>f(x_k)</td><td id="b1f">—</td></tr>
+        <tr><td>‖x_k − x*‖</td><td id="b1e">—</td></tr>
+        <tr><td>итераций до сходимости</td><td id="b1total">—</td></tr>
+      </table>
+      <p class="expect">Ожидается при старте (−1.2, 1): спуск 13 756 · Ньютон 7 · Ньютон с backtracking 22 · BFGS 34.</p>
+      <p class="hint">Попробуйте: клик по холсту задаёт старт; клавиши ← → — шаг назад/вперёд, пробел — запустить. Стартуйте над дном долины (x₂ > x₁² + 0.005) и посмотрите, куда идёт чистый Ньютон.</p>
+    </div>
+  </section>
+
+  <!-- ===================== сцена 2 ===================== -->
+  <section id="s2" class="scene" role="tabpanel" hidden>
+    <div>
+      <canvas id="c2" width="560" height="560" aria-label="бассейны притяжения метода Ньютона на функции Химмельблау"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Химмельблау: f = (x₁²+x₂−11)² + (x₁+x₂²−7)²</h2>
+      <p class="what">Что увидеть: каждая точка сетки окрашена по тому, в какую из девяти стационарных точек приходит чистый Ньютон. Звёзды — минимумы, квадраты — сёдла, крест — максимум.</p>
+      <table class="board">
+        <tr><td>сетка</td><td id="b2grid">150 × 150</td></tr>
+        <tr><td>в минимум</td><td id="b2min">—</td></tr>
+        <tr><td>в седло</td><td id="b2sad">—</td></tr>
+        <tr><td>в максимум</td><td id="b2max">—</td></tr>
+        <tr><td>медиана итераций</td><td id="b2med">—</td></tr>
+        <tr><td>последний клик</td><td id="b2click">—</td></tr>
+      </table>
+      <p class="expect">В конспекте (сетка 300×300): минимумы 64 %, сёдла 31 %, максимум 4 %, медиана 6 итераций.</p>
+      <p class="hint">Попробуйте: кликните рядом с границей двух цветов — два соседних старта уходят в разные точки. Второе прочтение шага Ньютона: он ищет нуль градиента, а не минимум.</p>
+    </div>
+  </section>
+
+  <!-- ===================== сцена 3 ===================== -->
+  <section id="s3" class="scene" role="tabpanel" hidden>
+    <div>
+      <canvas id="c3" width="560" height="420" aria-label="функция ln cosh x, параболы-модели и шаги Ньютона"></canvas>
+    </div>
+    <div class="panel">
+      <h2>f(x) = ln cosh x: парабола едет по функции</h2>
+      <p class="what">Что увидеть: в точке x_k строится парабола с той же высотой, наклоном и кривизной; следующая точка — её вершина. Чем дальше старт, тем шире парабола и дальше вершина.</p>
+      <div class="formula">x_{k+1} = x_k − f′(x_k)/f″(x_k) = x_k − ½·sinh(2x_k)</div>
+      <div class="row"><label for="x03">старт x₀ = <span id="x03v">0.90</span></label><input type="range" id="x03" min="0.30" max="1.30" step="0.005" value="0.90"></div>
+      <table class="board">
+        <tr><td>x₁, x₂, x₃</td><td id="b3seq">—</td></tr>
+        <tr><td>итераций до |f′| ≤ 10⁻⁸</td><td id="b3k">—</td></tr>
+        <tr><td>порог 2-цикла</td><td id="b3thr">1.0887</td></tr>
+      </table>
+      <p class="expect">В конспекте: из 0.9 — четыре шага и 10⁻⁸; из 1.2 — 1.2 → −1.53 → 3.82 → −516; порог ≈ 1.0886.</p>
+      <p class="hint">Попробуйте: подведите ползунок к порогу — x₁ становится ровно −x₀, метод застревает в 2-цикле. Клавиши ← → двигают ползунок.</p>
+    </div>
+  </section>
+  <p class="hint"><small class="src">Исходник страницы — <code>lectures/lecture05/interactive/05_newton_vs_descent.html</code>; алгоритмы повторяют <code>l5helpers.py</code>: backtracking по Армихо с c = 10⁻⁴ от α = 1 делением пополам, те же допуски и maxit.</small></p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const C = () => ({ blue: css("--blue"), orange: css("--orange"), aqua: css("--aqua"), red: css("--red"), violet: css("--violet"), gray: css("--gray"), fg: css("--fg"), muted: css("--muted"), panel: css("--panel"), line: css("--line") });
+
+  // ---------------- вкладки
+  const tabs = document.querySelectorAll(".tabs button");
+  let active = "s1";
+  function showTab(id) {
+    active = id;
+    tabs.forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === id)));
+    ["s1", "s2", "s3"].forEach(s => { document.getElementById(s).hidden = s !== id; });
+    if (id === "s2" && !basinsDone) computeBasins();
+    if (id === "s3") draw3();
+    if (id === "s1") draw1();
+  }
+  tabs.forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  const h = (location.hash || "").slice(1);
+  if (["s1", "s2", "s3"].includes(h)) active = h;
+
+  // ---------------- Розенброк и методы (тот же код, что в l5helpers.py)
+  const rosen = (x) => (1 - x[0]) ** 2 + 100 * (x[1] - x[0] ** 2) ** 2;
+  const rgrad = (x) => [-2 * (1 - x[0]) - 400 * x[0] * (x[1] - x[0] ** 2), 200 * (x[1] - x[0] ** 2)];
+  const rhess = (x) => [[2 - 400 * x[1] + 1200 * x[0] ** 2, -400 * x[0]], [-400 * x[0], 200]];
+  const norm = (v) => Math.hypot(v[0], v[1]);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  const solve2 = (H, b) => { const d = H[0][0] * H[1][1] - H[0][1] * H[1][0]; return [(H[1][1] * b[0] - H[0][1] * b[1]) / d, (H[0][0] * b[1] - H[1][0] * b[0]) / d]; };
+  const eigmin2 = (H) => { const tr = H[0][0] + H[1][1], det = H[0][0] * H[1][1] - H[0][1] * H[1][0]; return tr / 2 - Math.sqrt(Math.max(tr * tr / 4 - det, 0)); };
+  function armijo(f, x, p, g, c = 1e-4) { let a = 1, fx = f(x); while (f([x[0] + a * p[0], x[1] + a * p[1]]) > fx + c * a * dot(g, p)) { a /= 2; if (a < 1e-20) break; } return a; }
+
+  function runMethod(method, x0) {
+    const path = [x0.slice()]; let x = x0.slice(), k = 0; const maxit = { gd: 100000, newton: 50, damped: 200, bfgs: 10000 }[method];
+    const tol = method === "newton" || method === "damped" ? 1e-10 : 1e-6;
+    let H = [[1, 0], [0, 1]], g = rgrad(x), converged = false;
+    for (k = 0; k < maxit; k++) {
+      g = rgrad(x);
+      if (!isFinite(g[0]) || !isFinite(g[1])) break;
+      if (norm(g) <= tol) { converged = true; break; }
+      let p;
+      if (method === "gd") { p = [-g[0], -g[1]]; const a = armijo(rosen, x, p, g); p = [a * p[0], a * p[1]]; }
+      else if (method === "newton") { p = solve2(rhess(x), [-g[0], -g[1]]); }
+      else if (method === "damped") {
+        const Hk = rhess(x); p = solve2(Hk, [-g[0], -g[1]]);
+        if (dot(g, p) >= 0) { const t = Math.abs(eigmin2(Hk)) + 1e-3; p = solve2([[Hk[0][0] + t, Hk[0][1]], [Hk[1][0], Hk[1][1] + t]], [-g[0], -g[1]]); }
+        const a = armijo(rosen, x, p, g); p = [a * p[0], a * p[1]];
+      } else { // bfgs
+        p = [-(H[0][0] * g[0] + H[0][1] * g[1]), -(H[1][0] * g[0] + H[1][1] * g[1])];
+        const a = armijo(rosen, x, p, g); const s = [a * p[0], a * p[1]];
+        const xn = [x[0] + s[0], x[1] + s[1]]; const gn = rgrad(xn); const y = [gn[0] - g[0], gn[1] - g[1]];
+        const sy = dot(s, y);
+        if (sy > 1e-12) {
+          const rho = 1 / sy;
+          // H' = (I - rho s y^T) H (I - rho y s^T) + rho s s^T
+          const A = [[1 - rho * s[0] * y[0], -rho * s[0] * y[1]], [-rho * s[1] * y[0], 1 - rho * s[1] * y[1]]];
+          const AH = [[A[0][0] * H[0][0] + A[0][1] * H[1][0], A[0][0] * H[0][1] + A[0][1] * H[1][1]], [A[1][0] * H[0][0] + A[1][1] * H[1][0], A[1][0] * H[0][1] + A[1][1] * H[1][1]]];
+          const AT = [[A[0][0], A[1][0]], [A[0][1], A[1][1]]];
+          H = [[AH[0][0] * AT[0][0] + AH[0][1] * AT[1][0] + rho * s[0] * s[0], AH[0][0] * AT[0][1] + AH[0][1] * AT[1][1] + rho * s[0] * s[1]],
+               [AH[1][0] * AT[0][0] + AH[1][1] * AT[1][0] + rho * s[1] * s[0], AH[1][0] * AT[0][1] + AH[1][1] * AT[1][1] + rho * s[1] * s[1]]];
+        }
+        p = s;
+      }
+      x = [x[0] + p[0], x[1] + p[1]]; path.push(x.slice());
+      if (Math.abs(x[0]) > 1e6 || Math.abs(x[1]) > 1e6) break;
+    }
+    return { path, total: converged ? k : null };
+  }
+
+  // ---------------- сцена 1: рисование
+  const c1 = document.getElementById("c1"), ctx1 = c1.getContext("2d");
+  const c1e = document.getElementById("c1e"), ctxE = c1e.getContext("2d");
+  const view1 = { xmin: -2.2, xmax: 2.2, ymin: -3.5, ymax: 3.2 };
+  let start1 = [-1.2, 1.0], method1 = "newton", res1 = runMethod("newton", start1), k1 = 0, heat = null, timer1 = null;
+  const toPx1 = (x) => [(x[0] - view1.xmin) / (view1.xmax - view1.xmin) * c1.width, (view1.ymax - x[1]) / (view1.ymax - view1.ymin) * c1.height];
+  const fromPx1 = (px, py) => [view1.xmin + px / c1.width * (view1.xmax - view1.xmin), view1.ymax - py / c1.height * (view1.ymax - view1.ymin)];
+  function makeHeat() {
+    const img = ctx1.createImageData(c1.width, c1.height); const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light" || document.documentElement.dataset.theme === "dark";
+    for (let j = 0; j < c1.height; j++) for (let i = 0; i < c1.width; i++) {
+      const x = fromPx1(i + 0.5, j + 0.5); const v = Math.log10(rosen(x) + 1e-3); // -3 .. ~3.5
+      const t = Math.min(1, Math.max(0, (v + 1) / 4.5));
+      const band = Math.abs(((v * 3) % 1 + 1) % 1 - 0.5) < 0.06 ? 1 : 0; // линии уровня каждые 1/3 декады
+      let r, g, b;
+      if (dark) { r = 31 + 60 * t; g = 33 + 50 * t; b = 38 + 90 * t; if (band) { r += 40; g += 40; b += 40; } }
+      else { r = 255 - 90 * t; g = 255 - 70 * t; b = 255 - 30 * t; if (band) { r -= 40; g -= 40; b -= 40; } }
+      const o = 4 * (j * c1.width + i); img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255;
+    }
+    heat = img;
+  }
+  function draw1() {
+    const col = C(); if (!heat) makeHeat(); ctx1.putImageData(heat, 0, 0);
+    // дно долины и граница индефинитности
+    ctx1.strokeStyle = col.red; ctx1.setLineDash([4, 4]); ctx1.lineWidth = 1; ctx1.beginPath();
+    for (let i = 0; i <= 200; i++) { const x = view1.xmin + i / 200 * (view1.xmax - view1.xmin); const p = toPx1([x, x * x + 0.005]); i ? ctx1.lineTo(p[0], p[1]) : ctx1.moveTo(p[0], p[1]); }
+    ctx1.stroke(); ctx1.setLineDash([]);
+    ctx1.fillStyle = col.red; ctx1.font = "12px " + css("--font-ui"); ctx1.fillText("над пунктиром гессиан индефинитен", 10, 18);
+    // путь
+    const colors = { gd: col.blue, newton: col.orange, damped: col.violet, bfgs: col.aqua };
+    const path = res1.path; const n = Math.min(k1, path.length - 1);
+    ctx1.strokeStyle = colors[method1]; ctx1.lineWidth = 1.6; ctx1.beginPath();
+    const stride = path.length > 2000 ? Math.ceil(path.length / 2000) : 1;
+    for (let i = 0; i <= n; i += (i < 40 ? 1 : stride)) { const p = toPx1(path[i]); i ? ctx1.lineTo(p[0], p[1]) : ctx1.moveTo(p[0], p[1]); }
+    const pl = toPx1(path[n]); ctx1.lineTo(pl[0], pl[1]); ctx1.stroke();
+    ctx1.fillStyle = colors[method1];
+    for (let i = 0; i <= n && i < 60; i++) { const p = toPx1(path[i]); ctx1.beginPath(); ctx1.arc(p[0], p[1], 3, 0, 7); ctx1.fill(); }
+    // старт, минимум, текущая
+    const s = toPx1(path[0]); ctx1.fillStyle = col.fg; ctx1.beginPath(); ctx1.arc(s[0], s[1], 5, 0, 7); ctx1.fill();
+    const m = toPx1([1, 1]); ctx1.fillStyle = col.red; star(ctx1, m[0], m[1], 8);
+    ctx1.fillStyle = colors[method1]; ctx1.beginPath(); ctx1.arc(pl[0], pl[1], 6, 0, 7); ctx1.fill(); ctx1.strokeStyle = col.panel; ctx1.lineWidth = 2; ctx1.stroke();
+    if (Math.abs(path[n][0]) > view1.xmax || path[n][1] < view1.ymin || path[n][1] > view1.ymax) { ctx1.fillStyle = col.fg; ctx1.fillText(`x_${n} = (${path[n][0].toFixed(2)}, ${path[n][1].toFixed(2)}) — за краем`, 10, c1.height - 10); }
+    // табло
+    const xk = path[n], g = rgrad(xk);
+    document.getElementById("b1start").textContent = `(${path[0][0].toFixed(2)}, ${path[0][1].toFixed(2)})`;
+    document.getElementById("b1k").textContent = n;
+    document.getElementById("b1x").textContent = `(${fmt(xk[0])}, ${fmt(xk[1])})`;
+    document.getElementById("b1g").textContent = norm(g).toExponential(2);
+    document.getElementById("b1f").textContent = rosen(xk).toExponential(2);
+    document.getElementById("b1e").textContent = Math.hypot(xk[0] - 1, xk[1] - 1).toExponential(2);
+    document.getElementById("b1total").textContent = res1.total === null ? "не сошёлся (maxit или уход в бесконечность)" : res1.total.toLocaleString("ru-RU");
+    drawErr();
+  }
+  function fmt(v) { return Math.abs(v) < 1e4 ? v.toFixed(4) : v.toExponential(2); }
+  function star(ctx, x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); } ctx.closePath(); ctx.fill(); }
+  function drawErr() {
+    const col = C(); ctxE.fillStyle = col.panel; ctxE.fillRect(0, 0, c1e.width, c1e.height);
+    const path = res1.path; const err = path.map(p => Math.log10(Math.hypot(p[0] - 1, p[1] - 1) + 1e-17));
+    const L = 44, R = 10, T = 14, B = 28; const W = c1e.width - L - R, Hh = c1e.height - T - B;
+    const kmax = Math.max(path.length - 1, 10); const logx = kmax > 60;
+    const X = (k) => L + (logx ? Math.log10(k + 1) / Math.log10(kmax + 1) : k / kmax) * W;
+    const Y = (v) => T + (1 - (v + 12) / 13) * Hh; // от -12 до 1
+    ctxE.strokeStyle = col.line; ctxE.lineWidth = 1; ctxE.beginPath(); ctxE.moveTo(L, T); ctxE.lineTo(L, T + Hh); ctxE.lineTo(L + W, T + Hh); ctxE.stroke();
+    ctxE.fillStyle = col.muted; ctxE.font = "11px " + css("--font-ui");
+    for (const v of [0, -4, -8, -12]) { ctxE.fillText(v, 6, Y(v) + 4); ctxE.strokeStyle = col.line; ctxE.beginPath(); ctxE.moveTo(L, Y(v)); ctxE.lineTo(L + W, Y(v)); ctxE.stroke(); }
+    ctxE.fillText("log₁₀ ‖x_k − x*‖", L + 6, T + 10); ctxE.fillText(logx ? "итерация k (лог. шкала)" : "итерация k", L + W / 2 - 50, c1e.height - 8);
+    // эталоны: линейная с q = 1 - 1/κ (κ = 2508) и квадратичная e_{k+1} = e_k^2 от e_0 = 0.5
+    ctxE.setLineDash([3, 3]); ctxE.strokeStyle = col.gray; ctxE.beginPath();
+    for (let k = 0; k <= kmax; k += Math.max(1, Math.floor(kmax / 300))) { const v = err[0] + k * Math.log10(1 - 1 / 2508); const p = [X(k), Y(Math.max(v, -12.5))]; k ? ctxE.lineTo(p[0], p[1]) : ctxE.moveTo(p[0], p[1]); }
+    ctxE.stroke(); ctxE.beginPath();
+    for (let k = 0, e = Math.log10(0.5); k <= 6 && e > -12.5; k++, e = 2 * e) { const p = [X(k), Y(e)]; k ? ctxE.lineTo(p[0], p[1]) : ctxE.moveTo(p[0], p[1]); }
+    ctxE.stroke(); ctxE.setLineDash([]);
+    ctxE.fillStyle = col.gray; ctxE.fillText("пунктир: линейная с q = 1 − 1/κ и квадратичная", L + W - 250, T + 10);
+    const colors = { gd: col.blue, newton: col.orange, damped: col.violet, bfgs: col.aqua };
+    ctxE.strokeStyle = colors[method1]; ctxE.lineWidth = 1.8; ctxE.beginPath();
+    const n = Math.min(k1, path.length - 1);
+    for (let k = 0; k <= n; k += Math.max(1, Math.floor(n / 1500))) { const p = [X(k), Y(Math.max(err[k], -12.5))]; k ? ctxE.lineTo(p[0], p[1]) : ctxE.moveTo(p[0], p[1]); }
+    ctxE.lineTo(X(n), Y(Math.max(err[n], -12.5))); ctxE.stroke();
+    ctxE.fillStyle = colors[method1]; ctxE.beginPath(); ctxE.arc(X(n), Y(Math.max(err[n], -12.5)), 4, 0, 7); ctxE.fill();
+  }
+  function reset1(newStart) { if (newStart) start1 = newStart; res1 = runMethod(method1, start1); k1 = 0; stopRun(); draw1(); }
+  function stopRun() { if (timer1) { cancelAnimationFrame(timer1); timer1 = null; } }
+  function stepFwd() { if (k1 < res1.path.length - 1) { k1 += k1 < 40 ? 1 : Math.max(1, Math.floor(res1.path.length / 200)); k1 = Math.min(k1, res1.path.length - 1); draw1(); } }
+  function stepBack() { if (k1 > 0) { k1 -= k1 <= 40 ? 1 : Math.max(1, Math.floor(res1.path.length / 200)); k1 = Math.max(k1, 0); draw1(); } }
+  function run1() { stopRun(); const tick = () => { if (k1 >= res1.path.length - 1) { timer1 = null; return; } stepFwd(); timer1 = requestAnimationFrame(tick); }; timer1 = requestAnimationFrame(tick); }
+  document.getElementById("m1").addEventListener("change", (e) => { method1 = e.target.value; reset1(); });
+  document.getElementById("step1").addEventListener("click", () => { stopRun(); stepFwd(); });
+  document.getElementById("run1").addEventListener("click", run1);
+  document.getElementById("reset1").addEventListener("click", () => reset1([-1.2, 1.0]));
+  c1.addEventListener("click", (e) => { const r = c1.getBoundingClientRect(); const px = (e.clientX - r.left) * c1.width / r.width, py = (e.clientY - r.top) * c1.height / r.height; reset1(fromPx1(px, py)); });
+
+  // ---------------- сцена 2: бассейны Химмельблау
+  const c2 = document.getElementById("c2"), ctx2 = c2.getContext("2d"); let basinsDone = false; const N2 = 150, lim2 = 6;
+  const hgrad = (x, y) => { const a = x * x + y - 11, b = x + y * y - 7; return [4 * x * a + 2 * b, 2 * a + 4 * y * b]; };
+  const hhess = (x, y) => [[12 * x * x + 4 * y - 42, 4 * x + 4 * y], [4 * x + 4 * y, 4 * x + 12 * y * y - 26]];
+  let stat2 = [], kinds2 = [], cell2 = null, clickPath = null;
+  function newtonH(x, y, maxit = 40) { const path = [[x, y]]; for (let k = 0; k < maxit; k++) { const g = hgrad(x, y); if (Math.hypot(g[0], g[1]) < 1e-8) return { x, y, k, path }; const p = solve2(hhess(x, y), [-g[0], -g[1]]); if (!isFinite(p[0]) || !isFinite(p[1])) return null; x += p[0]; y += p[1]; path.push([x, y]); if (Math.abs(x) > 1e4) return null; } return null; }
+  function computeBasins() {
+    stat2 = []; kinds2 = []; cell2 = new Int16Array(N2 * N2).fill(-1); const its = [];
+    for (let j = 0; j < N2; j++) for (let i = 0; i < N2; i++) {
+      const x0 = -lim2 + (i + 0.5) / N2 * 2 * lim2, y0 = -lim2 + (j + 0.5) / N2 * 2 * lim2; const r = newtonH(x0, y0); if (!r) continue;
+      let idx = stat2.findIndex(s => Math.hypot(s[0] - r.x, s[1] - r.y) < 1e-3);
+      if (idx < 0) { stat2.push([r.x, r.y]); const Hm = hhess(r.x, r.y); const tr = Hm[0][0] + Hm[1][1], det = Hm[0][0] * Hm[1][1] - Hm[0][1] * Hm[1][0]; kinds2.push(det < 0 ? "saddle" : (tr > 0 ? "min" : "max")); idx = stat2.length - 1; }
+      cell2[j * N2 + i] = idx; its.push(r.k);
+    }
+    its.sort((a, b) => a - b); const med = its[Math.floor(its.length / 2)];
+    const tot = its.length; const share = (kind) => { let n = 0; for (let q = 0; q < cell2.length; q++) if (cell2[q] >= 0 && kinds2[cell2[q]] === kind) n++; return (100 * n / tot).toFixed(0) + " %"; };
+    document.getElementById("b2min").textContent = share("min"); document.getElementById("b2sad").textContent = share("saddle"); document.getElementById("b2max").textContent = share("max"); document.getElementById("b2med").textContent = med;
+    basinsDone = true; draw2();
+  }
+  const palette2 = { min: ["#2a78d6", "#1baf7a", "#4a3aa7", "#5fb8e8"], saddle: ["#eb6834", "#eda100", "#f3a35f", "#c9a227"], max: ["#e34948"] };
+  function draw2() {
+    const col = C(); const img = ctx2.createImageData(c2.width, c2.height); const counters = { min: 0, saddle: 0, max: 0 }; const colorOf = [];
+    stat2.forEach((s, i) => { const k = kinds2[i]; const hex = palette2[k][counters[k] % palette2[k].length]; counters[k]++; colorOf.push([parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]); });
+    for (let j = 0; j < c2.height; j++) for (let i = 0; i < c2.width; i++) {
+      const gi = Math.floor(i / c2.width * N2), gj = Math.floor((c2.height - 1 - j) / c2.height * N2); const idx = cell2[gj * N2 + gi]; const o = 4 * (j * c2.width + i);
+      const rgb = idx >= 0 ? colorOf[idx] : [120, 120, 120]; img.data[o] = rgb[0]; img.data[o + 1] = rgb[1]; img.data[o + 2] = rgb[2]; img.data[o + 3] = 230;
+    }
+    ctx2.putImageData(img, 0, 0);
+    const toPx = (p) => [(p[0] + lim2) / (2 * lim2) * c2.width, (lim2 - p[1]) / (2 * lim2) * c2.height];
+    stat2.forEach((s, i) => { const p = toPx(s); ctx2.fillStyle = "#111"; ctx2.strokeStyle = "#fff"; ctx2.lineWidth = 1.5; if (kinds2[i] === "min") { star(ctx2, p[0], p[1], 10); ctx2.stroke(); } else if (kinds2[i] === "saddle") { ctx2.fillRect(p[0] - 6, p[1] - 6, 12, 12); ctx2.strokeRect(p[0] - 6, p[1] - 6, 12, 12); } else { ctx2.beginPath(); ctx2.moveTo(p[0] - 7, p[1] - 7); ctx2.lineTo(p[0] + 7, p[1] + 7); ctx2.moveTo(p[0] + 7, p[1] - 7); ctx2.lineTo(p[0] - 7, p[1] + 7); ctx2.lineWidth = 4; ctx2.strokeStyle = "#111"; ctx2.stroke(); ctx2.lineWidth = 2; ctx2.strokeStyle = "#fff"; ctx2.stroke(); } });
+    if (clickPath) { ctx2.strokeStyle = "#fff"; ctx2.lineWidth = 2.5; ctx2.beginPath(); clickPath.forEach((q, i) => { const p = toPx(q); i ? ctx2.lineTo(p[0], p[1]) : ctx2.moveTo(p[0], p[1]); }); ctx2.stroke(); ctx2.strokeStyle = "#111"; ctx2.lineWidth = 1; ctx2.stroke(); const p0 = toPx(clickPath[0]); ctx2.fillStyle = "#fff"; ctx2.beginPath(); ctx2.arc(p0[0], p0[1], 5, 0, 7); ctx2.fill(); ctx2.strokeStyle = "#111"; ctx2.stroke(); }
+    ctx2.fillStyle = col.fg; ctx2.font = "12px " + css("--font-ui");
+  }
+  c2.addEventListener("click", (e) => { const r = c2.getBoundingClientRect(); const px = (e.clientX - r.left) * c2.width / r.width, py = (e.clientY - r.top) * c2.height / r.height; const x = -lim2 + px / c2.width * 2 * lim2, y = lim2 - py / c2.height * 2 * lim2; const res = newtonH(x, y); clickPath = res ? res.path : [[x, y]]; const kind = res ? kinds2[stat2.findIndex(s => Math.hypot(s[0] - res.x, s[1] - res.y) < 1e-3)] : null; const names = { min: "минимум", saddle: "седло", max: "максимум" }; document.getElementById("b2click").textContent = res ? `(${x.toFixed(2)}, ${y.toFixed(2)}) → ${names[kind] || "?"} за ${res.k}` : "не сошёлся"; draw2(); });
+
+  // ---------------- сцена 3: ln cosh
+  const c3 = document.getElementById("c3"), ctx3 = c3.getContext("2d"); const slider = document.getElementById("x03");
+  const f3 = (x) => Math.log(Math.cosh(Math.min(Math.abs(x), 700))); const df3 = Math.tanh; const d2f3 = (x) => 1 / Math.cosh(x) ** 2;
+  function thr3() { let lo = 0.5, hi = 1.5; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; (2 * m - 0.5 * Math.sinh(2 * m) > 0) ? lo = m : hi = m; } return (lo + hi) / 2; }
+  const THR = thr3(); document.getElementById("b3thr").textContent = THR.toFixed(4);
+  function draw3() {
+    const col = C(); const x0 = parseFloat(slider.value); document.getElementById("x03v").textContent = x0.toFixed(3);
+    const xs = [x0]; let ok = false, kk = 0;
+    for (kk = 0; kk < 30; kk++) { const x = xs[xs.length - 1]; if (Math.abs(Math.tanh(x)) <= 1e-8) { ok = true; break; } const xn = x - 0.5 * Math.sinh(2 * x); xs.push(xn); if (!isFinite(xn) || Math.abs(xn) > 50) break; }
+    const view = { xmin: -3.2, xmax: 4.6, ymin: -0.45, ymax: 3.6 }; const toPx = (x, y) => [(x - view.xmin) / (view.xmax - view.xmin) * c3.width, (view.ymax - y) / (view.ymax - view.ymin) * c3.height];
+    ctx3.fillStyle = col.panel; ctx3.fillRect(0, 0, c3.width, c3.height);
+    ctx3.strokeStyle = col.line; ctx3.lineWidth = 1; const ax = toPx(0, 0); ctx3.beginPath(); ctx3.moveTo(0, ax[1]); ctx3.lineTo(c3.width, ax[1]); ctx3.moveTo(ax[0], 0); ctx3.lineTo(ax[0], c3.height); ctx3.stroke();
+    ctx3.setLineDash([3, 3]); ctx3.strokeStyle = col.gray; for (const s of [THR, -THR]) { const p = toPx(s, 0); ctx3.beginPath(); ctx3.moveTo(p[0], 0); ctx3.lineTo(p[0], c3.height); ctx3.stroke(); } ctx3.setLineDash([]);
+    ctx3.fillStyle = col.muted; ctx3.font = "12px " + css("--font-ui"); ctx3.fillText("порог " + THR.toFixed(4), toPx(THR, 0)[0] + 4, 16);
+    const color = ok ? col.aqua : col.red;
+    for (let j = 0; j < Math.min(3, xs.length - 1); j++) { const xk = xs[j]; ctx3.strokeStyle = color; ctx3.globalAlpha = 0.95 - 0.3 * j; ctx3.lineWidth = 1.4; ctx3.setLineDash(j ? [5, 4] : []); ctx3.beginPath(); for (let i = 0; i <= 400; i++) { const x = view.xmin + i / 400 * (view.xmax - view.xmin); const y = f3(xk) + df3(xk) * (x - xk) + 0.5 * d2f3(xk) * (x - xk) ** 2; const p = toPx(x, y); i ? ctx3.lineTo(p[0], p[1]) : ctx3.moveTo(p[0], p[1]); } ctx3.stroke(); }
+    ctx3.globalAlpha = 1; ctx3.setLineDash([]);
+    ctx3.strokeStyle = col.fg; ctx3.lineWidth = 2.4; ctx3.beginPath(); for (let i = 0; i <= 500; i++) { const x = view.xmin + i / 500 * (view.xmax - view.xmin); const p = toPx(x, f3(x)); i ? ctx3.lineTo(p[0], p[1]) : ctx3.moveTo(p[0], p[1]); } ctx3.stroke();
+    ctx3.fillStyle = col.red; const m = toPx(0, 0); star(ctx3, m[0], m[1], 8);
+    ctx3.fillStyle = color; ctx3.strokeStyle = color; ctx3.lineWidth = 1;
+    for (let j = 0; j < Math.min(5, xs.length); j++) { const x = xs[j]; if (Math.abs(x) > view.xmax) continue; const p = toPx(x, f3(x)); ctx3.beginPath(); ctx3.arc(p[0], p[1], 5, 0, 7); ctx3.fill(); ctx3.fillText("x" + "₀₁₂₃₄"[j], p[0] + 6, p[1] - 6); if (j + 1 < xs.length && Math.abs(xs[j + 1]) <= view.xmax) { const q = toPx(xs[j + 1], f3(xs[j + 1])); ctx3.setLineDash([2, 3]); ctx3.beginPath(); ctx3.moveTo(q[0], q[1]); ctx3.lineTo(q[0], ax[1]); ctx3.stroke(); ctx3.setLineDash([]); } }
+    ctx3.fillStyle = ok ? col.fg : col.red; ctx3.font = "bold 13px " + css("--font-ui"); ctx3.fillText(ok ? `старт ${x0.toFixed(3)}: сошёлся за ${kk} итераций` : `старт ${x0.toFixed(3)}: расходится — вершина параболы всё дальше`, 10, c3.height - 12);
+    document.getElementById("b3seq").textContent = xs.slice(1, 4).map(v => Math.abs(v) < 100 ? v.toFixed(3) : v.toExponential(1)).join(", ") || "—";
+    document.getElementById("b3k").textContent = ok ? kk : "расходится";
+  }
+  slider.addEventListener("input", draw3);
+
+  // ---------------- клавиатура
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    if (active === "s1") { if (e.key === "ArrowRight") { stopRun(); stepFwd(); e.preventDefault(); } else if (e.key === "ArrowLeft") { stopRun(); stepBack(); e.preventDefault(); } else if (e.key === " ") { run1(); e.preventDefault(); } }
+    if (active === "s3") { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { slider.value = (parseFloat(slider.value) + (e.key === "ArrowRight" ? 0.005 : -0.005)).toFixed(3); draw3(); e.preventDefault(); } }
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { heat = null; draw1(); if (basinsDone) draw2(); draw3(); });
+
+  // ---------------- самопроверка чисел конспекта (в консоль)
+  const expect = { gd: 13756, newton: 7, damped: 22, bfgs: 34 };
+  const got = Object.fromEntries(Object.keys(expect).map(m => [m, runMethod(m, [-1.2, 1.0]).total]));
+  console.log("самопроверка (−1.2, 1):", got, "ожидалось:", expect, Object.keys(expect).every(m => got[m] === expect[m]) ? "совпало" : "РАСХОЖДЕНИЕ");
+  showTab(active);
+})();
+</script>
