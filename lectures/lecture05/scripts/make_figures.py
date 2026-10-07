@@ -1,11 +1,27 @@
-"""Иллюстрации к конспекту лекции 5 -> папка img/ (коммитится в репозиторий).
+"""Иллюстрации к конспекту лекции 5 -> папка ../img/ (коммитится в репозиторий).
 
-Запуск:  uv run python lectures/lecture05/make_figures.py
+Запуск:  uv run python lectures/lecture05/scripts/make_figures.py
 
-Скрипт самодостаточен. Палитра и оформление — те же, что в лекциях 1-4.
-Методы (gd, newton, newton_damped, bfgs, gauss_newton) определены здесь тем же
-кодом, что в build_demo05.py; числа конспекта считаются в скрипте и
-проверяются ассертами.
+Скрипт самодостаточен. Палитра — та же, что в лекциях 1-4; размеры — по правилу
+«ширина PNG в пикселях ≈ ширине показа»: dpi 100, figsize не шире 9 дюймов, шрифт 12,
+так что при <img width="900"> подписи не уменьшаются. Методы (gd, newton, newton_damped,
+bfgs, gauss_newton) определены здесь тем же кодом, что в build_demo05.py; числа
+конспекта считаются в скрипте и проверяются ассертами.
+
+Картинки в порядке появления в конспекте:
+  00_hooks            две задачи-крючка: Розенброк и синус ДЗ 2
+  01_model_1d         парабола-модель касается функции; вершина — следующая точка
+  02_model_ellipses   эллипсы модели на Розенброке в x_0 и x_1
+  03_newton_1d        ln cosh: сходится из 0.9, расходится из 1.2
+  04_rates_newton     спуск (прямая) против чистого Ньютона (горб и обрыв)
+  05_basins           Химмельблау: куда приходит Ньютон из каждой точки
+  06_damped           чистый против демпфированного Ньютона: 7 с выбросом, 22 без
+  07_bowl_saddle      модель-чаша и модель-седло: куда ведёт шаг
+  08_secant           касательная против секущей на графике f'
+  09_bfgs_ellipses    BFGS на квадратичной: B_0 = I, B_1, B_2 = Q
+  10_rates_three      спуск, BFGS, Ньютон: прямая, загиб, обрыв
+  11_gn_sine          Гаусс–Ньютон на синусе: кривые и ошибки
+  12_chain_methods    цепь: итерации от N для четырёх методов
 """
 
 import time
@@ -18,9 +34,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import FancyArrowPatch
-from scipy.optimize import minimize
+from PIL import Image
+from scipy.optimize import brentq, minimize
 
-IMG = Path(__file__).resolve().parent / "img"
+IMG = Path(__file__).resolve().parent.parent / "img"
 IMG.mkdir(exist_ok=True)
 
 BLUE, ORANGE, AQUA, YELLOW, RED, VIOLET = (
@@ -28,19 +45,25 @@ BLUE, ORANGE, AQUA, YELLOW, RED, VIOLET = (
 GRAY, INK = "#8a8985", "#0b0b0b"
 
 plt.rcParams.update({
-    "font.size": 10, "axes.titlesize": 11, "axes.labelsize": 10,
+    "font.size": 12, "axes.titlesize": 13, "axes.labelsize": 12, "legend.fontsize": 11,
+    "xtick.labelsize": 11, "ytick.labelsize": 11,
     "axes.spines.top": False, "axes.spines.right": False,
     "axes.grid": True, "grid.alpha": 0.2, "grid.linewidth": 0.6,
     "lines.linewidth": 2, "legend.frameon": False,
-    "figure.dpi": 150, "savefig.dpi": 150,
+    "figure.dpi": 100, "savefig.dpi": 100,
 })
+
+MAX_WIDTH = 920        # px: картинка показывается с width="900", уменьшать её нельзя
 
 
 def save(name: str) -> None:
     plt.tight_layout()
-    plt.savefig(IMG / name, bbox_inches="tight")
+    path = IMG / name
+    plt.savefig(path, bbox_inches="tight")
     plt.close()
-    print("  ", name)
+    w, h = Image.open(path).size
+    assert 600 <= w <= MAX_WIDTH, f"{name}: ширина {w} px — нужна 600–{MAX_WIDTH}, иначе подписи нечитаемы"
+    print(f"   {name}: {w}x{h}")
 
 
 def arrow(ax, p, q, color, lw=2, ms=14, **kw):
@@ -49,7 +72,7 @@ def arrow(ax, p, q, color, lw=2, ms=14, **kw):
 
 # ---------------------------------------------------------------- методы (те же, что в demo05 / l5helpers.py)
 def gd(f, grad, x0, alpha=None, tol=1e-6, maxit=100_000, c=1e-4):
-    """Градиентный спуск (лекция 4): alpha=None — backtracking по Армихо с константой c,
+    """Градиентный спуск (лекция 4): alpha=None — backtracking по правилу Армихо с константой c,
     иначе постоянный шаг. Возвращает (x, число итераций, путь (k+1, n))."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
@@ -67,7 +90,7 @@ def gd(f, grad, x0, alpha=None, tol=1e-6, maxit=100_000, c=1e-4):
 
 
 def newton(grad, hess, x0, tol=1e-10, maxit=50):
-    """Чистый метод Ньютона: x <- x - H^{-1} g, без линейного поиска. Возвращает (x, итераций, путь)."""
+    """Чистый метод Ньютона: x <- x - H^{-1} g, без выбора длины шага. Возвращает (x, итераций, путь)."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
         g = grad(x)
@@ -78,9 +101,9 @@ def newton(grad, hess, x0, tol=1e-10, maxit=50):
 
 
 def newton_damped(f, grad, hess, x0, tol=1e-10, maxit=200, c=1e-4):
-    """Демпфированный Ньютон: направление Ньютона, длина шага — backtracking по Армихо.
-    Если гессиан не положительно определён и направление не является спуском, матрица
-    регуляризуется: H + (|lambda_min| + 1e-3) I. Возвращает (x, итераций, путь)."""
+    """Демпфированный Ньютон: направление Ньютона, длина шага — по правилу Армихо.
+    Если гессиан индефинитен и направление не является спуском, матрица
+    сдвигается: H + (|lambda_min| + 1e-3) I. Возвращает (x, итераций, путь)."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
         g = grad(x)
@@ -100,7 +123,7 @@ def newton_damped(f, grad, hess, x0, tol=1e-10, maxit=200, c=1e-4):
 
 def bfgs(f, grad, x0, tol=1e-6, maxit=10_000, c=1e-4, Q=None):
     """BFGS с H_0 = I: p = -H g, обновление обратного гессиана по паре (s, y).
-    Длина шага: backtracking по Армихо (Q=None) или точный шаг на квадратичной
+    Длина шага: правило Армихо (Q=None) или точный шаг на квадратичной
     1/2 x^T Q x + b^T x (передать Q). Возвращает (x, итераций, путь, число вычислений f)."""
     x = np.asarray(x0, float).copy(); n = len(x)
     H = np.eye(n); path = [x.copy()]; g = grad(x); nfev = 1
@@ -125,7 +148,7 @@ def bfgs(f, grad, x0, tol=1e-6, maxit=10_000, c=1e-4, Q=None):
 
 def gauss_newton(resid, jac, x0, tol=1e-6, maxit=100, damped=False, c=1e-4):
     """Гаусс–Ньютон для f = 1/2 ||r(x)||^2: шаг — решение линейного МНК min ||J p + r||
-    (np.linalg.lstsq). damped=True — backtracking по Армихо. Возвращает (x, итераций, путь)."""
+    (np.linalg.lstsq). damped=True — длина шага по правилу Армихо. Возвращает (x, итераций, путь)."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
         r = resid(x); J = jac(x); g = J.T @ r
@@ -158,7 +181,7 @@ def rosen_contour(ax, xlim=(-2, 2), ylim=(-1, 3)):
     X, Y = np.meshgrid(np.linspace(*xlim, 400), np.linspace(*ylim, 400))
     Z = (1 - X) ** 2 + 100 * (Y - X ** 2) ** 2
     ax.contour(X, Y, Z, levels=np.logspace(-1, 3.3, 14), colors=GRAY, linewidths=0.7, alpha=0.8)
-    ax.plot(1, 1, "*", color=RED, ms=13, zorder=7)
+    ax.plot(1, 1, "*", color=RED, ms=14, zorder=7)
     ax.set(xlim=xlim, ylim=ylim, xlabel="$x_1$", ylabel="$x_2$")
 
 
@@ -258,6 +281,13 @@ def himmelblau_newton_basins(n=300, lim=6.0, maxit=30):
     return xs, idx.reshape(X.shape), its, uniq, kinds
 
 
+def lncosh_newton(x0, n=4):
+    xs = [x0]
+    for _ in range(n):
+        xs.append(xs[-1] - 0.5 * np.sinh(2 * xs[-1]))
+    return np.array(xs)
+
+
 # ================================================================ общие прогоны (числа конспекта)
 def runs_rosen():
     xg, kg, pg = gd(rosen, rosen_grad, X0_ROSEN)
@@ -271,7 +301,15 @@ def runs_rosen():
     en = np.linalg.norm(pn - 1, axis=1)
     assert np.allclose(en[:7], [2.2, 2.208, 4.182, 0.4796, 0.05597, 9.62e-6, 1.85e-11], rtol=0.02), en
     assert np.allclose(pn[2], [0.763, -3.175], atol=2e-3), pn[2]
-    return dict(gd=(kg, pg), newton=(kn, pn), damped=(kd, pd), bfgs=(kb, pb, nfb))
+    ed = np.linalg.norm(pd - 1, axis=1)
+    assert ed.max() < 2.3, ed.max()                      # демпфированный: без выброса (у чистого 4.18)
+    assert all(np.linalg.eigvalsh(rosen_hess(x))[0] > 0 for x in pn), "гессиан на пути Ньютона должен быть > 0"
+    # SciPy с тем же допуском: числа раздела 4.4 и таблицы раздела 6
+    r_b = minimize(rosen, X0_ROSEN, jac=rosen_grad, method="BFGS", options={"gtol": 1e-6})
+    r_l = minimize(rosen, X0_ROSEN, jac=rosen_grad, method="L-BFGS-B", options={"gtol": 1e-6})
+    assert (r_b.nit, r_b.nfev) == (33, 40), (r_b.nit, r_b.nfev)
+    assert r_l.nit == 36, r_l.nit
+    return dict(gd=(kg, pg), newton=(kn, pn), damped=(kd, pd), bfgs=(kb, pb, nfb), scipy=(r_b.nit, r_b.nfev, r_l.nit))
 
 
 def runs_sine():
@@ -282,7 +320,7 @@ def runs_sine():
     xnw, knw, pnw = newton(grad, hess, X0_SINE, tol=1e-6)
     assert kgn == 7 and np.allclose(xgn, [2.1014, 2.9967, 0.7003], atol=1e-3), (kgn, xgn)
     assert abs(kgd - 731) < 40 and np.allclose(xgd, xgn, atol=1e-3), (kgd, xgd)
-    assert abs(xnw[0]) < 1e-6 and knw < 20, (knw, xnw)          # Ньютон пришёл в точку с нулевой амплитудой
+    assert abs(xnw[0]) < 1e-6 and knw == 9, (knw, xnw)          # Ньютон пришёл в точку с нулевой амплитудой
     assert abs(f(xgn) - 1.1393) < 1e-3, f(xgn)
     lamJ = np.linalg.eigvalsh(jac(xgn).T @ jac(xgn)); lamH = np.linalg.eigvalsh(hess(xgn))
     assert np.allclose(lamJ, [17.57, 31.05, 1935.6], rtol=0.01) and np.allclose(lamH, [17.89, 31.12, 1927.3], rtol=0.01), (lamJ, lamH)
@@ -290,47 +328,61 @@ def runs_sine():
                 gn=(kgn, pgn, xgn), gd=(kgd, pgd), newton=(knw, pnw, xnw))
 
 
-# ================================================================ 00 три задачи-крючка
+# ================================================================ 00 две задачи-крючка
 def fig_hooks(R, S):
-    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.0), gridspec_kw=dict(width_ratios=[1.1, 1.2, 1]))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.3))
     ax = axes[0]
     kg, pg = R["gd"]; kn, pn = R["newton"]
     rosen_contour(ax, xlim=(-2.2, 2.2), ylim=(-3.5, 3.2))
-    ax.plot(pg[::50, 0], pg[::50, 1], "-", color=BLUE, lw=1.2, label=f"спуск, backtracking: {kg} итераций")
-    ax.plot(pn[:, 0], pn[:, 1], "-o", color=ORANGE, ms=5, lw=1.6, label=f"Ньютон: {kn} итераций")
-    ax.annotate("итерация 2", pn[2], (pn[2, 0] + 0.15, pn[2, 1] + 0.15), fontsize=8.5, color=ORANGE)
+    ax.plot(pg[::50, 0], pg[::50, 1], "-", color=BLUE, lw=1.4, label=f"спуск: {kg} итераций")
+    ax.plot(pn[:, 0], pn[:, 1], "-o", color=ORANGE, ms=5, lw=1.8, label=f"Ньютон: {kn} итераций")
+    ax.annotate("итерация 2", pn[2], (pn[2, 0] - 1.9, pn[2, 1] + 0.1), color=ORANGE)
     ax.plot(*X0_ROSEN, "o", color=INK, ms=6, zorder=7)
-    ax.legend(loc="upper left", fontsize=8.5)
+    ax.legend(loc="upper left")
     ax.set_title("Розенброк: 13 756 против 7 — и выброс")
 
     ax = axes[1]
     t, y = S["t"], S["y"]; kgn, pgn, xgn = S["gn"]; kgd, _ = S["gd"]; knw, _, xnw = S["newton"]
     tt = np.linspace(0, 2 * np.pi, 400)
     ax.plot(t, y, "o", ms=3.5, color=INK, alpha=0.7, label="данные ДЗ 2")
-    ax.plot(tt, xgn[0] * np.sin(xgn[1] * tt + xgn[2]), color=AQUA, lw=2.2,
-            label=f"Гаусс–Ньютон: {kgn} итераций (спуск: {kgd})")
-    ax.plot(tt, xnw[0] * np.sin(xnw[1] * tt + xnw[2]), color=RED, lw=2.2, ls="--",
-            label=f"Ньютон: {knw} итераций, $x_1=0$")
-    ax.set(xlabel="$t$", ylabel="$y$", ylim=(-3.2, 3.6), title="Подгонка синуса: $x_1\\sin(x_2t+x_3)$")
-    ax.legend(loc="upper right", fontsize=8.5)
-
-    ax = axes[2]
-    energy, grad_E, H, b, v0, unpack = make_chain(40)
-    yy, zz = unpack(np.linalg.solve(H, -b))
-    ax.plot(yy, zz, "-o", ms=3, color=BLUE, label="минимум энергии")
-    ax.plot([-2, 2], [1, 1], "s", color=INK, ms=6)
-    ax.set(xlabel="$y$", ylabel="$z$", title="Цепь: спуск 10 575, Ньютон — один solve")
-    ax.legend(loc="upper center", fontsize=8.5)
+    ax.plot(tt, xgn[0] * np.sin(xgn[1] * tt + xgn[2]), color=BLUE, lw=2.2, label=f"спуск: {kgd} итерация")
+    ax.plot(tt, xnw[0] * np.sin(xnw[1] * tt + xnw[2]), color=RED, lw=2.4, ls="--", label=f"Ньютон: {knw} итераций, $x_1=0$")
+    ax.set(xlabel="$t$", ylabel="$y$", ylim=(-3.2, 4.2), title="Синус: $x_1\\sin(x_2t+x_3)$")
+    ax.legend(loc="upper right")
     save("00_hooks.png")
 
 
-# ================================================================ 01 квадратичная модель в двух точках пути
-def fig_quadratic_model(R):
+# ================================================================ 01 парабола-модель касается функции
+def fig_model_1d():
+    f = lambda x: np.log(np.cosh(x)); df = np.tanh; d2f = lambda x: 1 / np.cosh(x) ** 2
+    xk = 0.9; x_next = xk - df(xk) / d2f(xk)
+    assert abs(x_next + 0.571) < 2e-3, x_next
+    t = np.linspace(-2.2, 2.6, 600)
+    par = f(xk) + df(xk) * (t - xk) + 0.5 * d2f(xk) * (t - xk) ** 2
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(t, f(t), color=INK, lw=2.4, label="функция $f$")
+    ax.plot(t, par, color=ORANGE, lw=2, label="модель $m_k(p)$ — парабола")
+    ax.plot(xk, f(xk), "o", color=INK, ms=8, zorder=7)
+    ax.plot(x_next, f(xk) + df(xk) * (x_next - xk) + 0.5 * d2f(xk) * (x_next - xk) ** 2, "s", color=ORANGE, ms=8, zorder=7)
+    ax.plot([x_next, x_next], [-0.3, f(x_next)], ":", color=ORANGE, lw=1.2)
+    ax.plot(0, 0, "*", color=RED, ms=14, zorder=7)
+    ax.annotate("$x_k$: та же высота,\nтот же наклон,\nта же кривизна", (xk, f(xk)), (1.2, -0.56), color=INK,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.annotate("$x_{k+1}=x_k+p_k$ —\nвершина параболы", (x_next, -0.3), (-2.15, -0.5), color=ORANGE,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.annotate("$x^*$", (0, 0), (0.12, -0.22), color=RED)
+    ax.set(xlim=(-2.2, 2.6), ylim=(-0.62, 1.9), xlabel="$x$", title="Квадратичная модель в точке $x_k$ и шаг Ньютона")
+    ax.legend(loc="upper left")
+    save("01_model_1d.png")
+
+
+# ================================================================ 02 эллипсы модели в двух точках пути
+def fig_model_ellipses(R):
     kn, pn = R["newton"]
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4))
     for ax, k, xlim, ylim, title in (
-        (axes[0], 0, (-2.2, 0.6), (-0.4, 2.4), "старт $x_0=(-1.2,\\,1)$: модель ещё похожа на функцию"),
-        (axes[1], 1, (-2.2, 2.2), (-3.6, 2.6), "$x_1=(-1.18,\\,1.38)$: минимум модели — за пределами долины"),
+        (axes[0], 0, (-2.2, 0.6), (-0.4, 2.4), "старт $x_0$: модель похожа на функцию"),
+        (axes[1], 1, (-2.2, 2.2), (-3.6, 2.6), "$x_1$: минимум модели далеко от функции"),
     ):
         xk = pn[k]; g = rosen_grad(xk); Hk = rosen_hess(xk); pstar = -np.linalg.solve(Hk, g)
         X, Y = np.meshgrid(np.linspace(*xlim, 400), np.linspace(*ylim, 400))
@@ -343,78 +395,63 @@ def fig_quadratic_model(R):
         ax.plot(*xk, "o", color=INK, ms=7, zorder=7)
         arrow(ax, xk, xk + pstar, ORANGE, lw=2.2)
         ax.plot(*(xk + pstar), "s", color=ORANGE, ms=7, zorder=7)
-        ax.plot(1, 1, "*", color=RED, ms=13, zorder=7)
+        ax.plot(1, 1, "*", color=RED, ms=14, zorder=7)
         ax.set(xlim=xlim, ylim=ylim, xlabel="$x_1$", ylabel="$x_2$", title=title)
-    axes[0].text(0.02, 0.03, "серые — линии уровня $f$, оранжевые — модели $m_k$;\nквадрат — минимум модели = следующая точка",
-                 transform=axes[0].transAxes, fontsize=8.5, color=GRAY)
-    axes[1].annotate(f"$x_2=({pn[2, 0]:.2f},\\,{pn[2, 1]:.2f})$ — минимум модели,\nно $f$ здесь больше, чем в $x_1$", pn[2], (pn[2, 0] + 0.25, pn[2, 1] + 0.35), fontsize=9, color=ORANGE)
-    save("01_quadratic_model.png")
+    axes[1].annotate(f"$x_2=({pn[2, 0]:.2f},\\,{pn[2, 1]:.2f})$", pn[2], (pn[2, 0] - 2.0, pn[2, 1] + 0.15), color=ORANGE)
+    save("02_model_ellipses.png")
 
 
-# ================================================================ 02 ln cosh: парабола едет по функции
-def lncosh_newton(x0, n=4):
-    xs = [x0]
-    for _ in range(n):
-        xs.append(xs[-1] - 0.5 * np.sinh(2 * xs[-1]))
-    return np.array(xs)
-
-
+# ================================================================ 03 ln cosh: сходится из 0.9, расходится из 1.2
 def fig_newton_1d():
     f = lambda x: np.log(np.cosh(x)); df = np.tanh; d2f = lambda x: 1 / np.cosh(x) ** 2
     seq_a, seq_b = lncosh_newton(0.9), lncosh_newton(1.2, 3)
     assert abs(seq_a[4]) < 1e-8 and abs(seq_a[3] + 1.557e-3) < 1e-5 and abs(seq_b[1] + 1.533) < 2e-3 and abs(seq_b[2] - 3.82) < 0.01 and abs(seq_b[3]) > 100, (seq_a, seq_b)
-    # порог: x1 = -x0  <=>  x0 - sinh(2x0)/2 = -x0
-    from scipy.optimize import brentq
-    thr = brentq(lambda x: 2 * x - 0.5 * np.sinh(2 * x), 0.5, 1.5)
+    thr = brentq(lambda x: 2 * x - 0.5 * np.sinh(2 * x), 0.5, 1.5)      # порог: x1 = -x0
     assert abs(thr - 1.0886) < 1e-3, thr
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.4))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.3))
     t = np.linspace(-2.6, 4.2, 600)
-    for ax, seq, nsteps, title, color in ((axes[0], seq_a, 2, "старт $0.9$: четыре шага — и $10^{-8}$", AQUA),
-                                          (axes[1], seq_b, 2, "старт $1.2$: вершина параболы перелетает всё дальше", RED)):
-        ax.plot(t, f(t), color=INK, lw=2.2, label="$f(x)=\\ln\\cosh x$")
-        for i in range(nsteps):
+    for ax, seq, title, color in ((axes[0], seq_a, "старт $0.9$: четыре шага — и $10^{-8}$", AQUA),
+                                  (axes[1], seq_b, "старт $1.2$: вершина перелетает всё дальше", RED)):
+        ax.plot(t, f(t), color=INK, lw=2.2, label="$f=\\ln\\cosh x$")
+        for i in range(2):
             xk = seq[i]; par = f(xk) + df(xk) * (t - xk) + 0.5 * d2f(xk) * (t - xk) ** 2
-            ax.plot(t, par, color=color, lw=1.3, alpha=0.9 - 0.3 * i, ls="-" if i == 0 else "--",
-                    label="парабола-модель в $x_k$" if i == 0 else None)
+            ax.plot(t, par, color=color, lw=1.4, alpha=0.9 - 0.3 * i, ls="-" if i == 0 else "--",
+                    label="парабола в $x_k$" if i == 0 else None)
             ax.plot(xk, f(xk), "o", color=color, ms=7, zorder=7)
-            ax.annotate(f"$x_{i}$", (xk, f(xk)), (xk + 0.08, f(xk) + 0.25), fontsize=9.5, color=color)
+            ax.annotate(f"$x_{i}$", (xk, f(xk)), (xk + 0.1, f(xk) + 0.25), color=color)
             ax.plot([seq[i + 1], seq[i + 1]], [0, f(seq[i + 1])], ":", color=color, lw=1)
-        ax.plot(seq[nsteps], f(seq[nsteps]), "o", color=color, ms=7, zorder=7)
-        ax.annotate(f"$x_{nsteps}={seq[nsteps]:.2f}$", (seq[nsteps], f(seq[nsteps])),
-                    (seq[nsteps] + 0.15, f(seq[nsteps]) + (0.75 if nsteps == 2 and abs(seq[nsteps]) < 1 else 0.3)), fontsize=9.5, color=color)
-        ax.plot(0, 0, "*", color=RED, ms=13, zorder=7)
+        ax.plot(seq[2], f(seq[2]), "o", color=color, ms=7, zorder=7)
+        ax.annotate(f"$x_2={seq[2]:.2f}$", (seq[2], f(seq[2])), (seq[2] + 0.15, 1.1) if abs(seq[2]) < 1 else (seq[2] - 1.45, 2.75), color=color)
+        ax.plot(0, 0, "*", color=RED, ms=14, zorder=7)
         ax.set(xlim=(-2.6, 4.2), ylim=(-0.3, 3.3), xlabel="$x$", title=title)
-        ax.legend(loc="upper left", fontsize=9)
-    axes[1].text(0.03, 0.70, f"порог: $x_0\\approx{thr:.4f}$ —\nтам 2-цикл $x_1=-x_0$", transform=axes[1].transAxes, fontsize=9.5, color=RED)
-    save("02_newton_1d.png")
+        ax.legend(loc="upper left")
+    axes[1].text(0.03, 0.62, f"порог $x_0\\approx{thr:.4f}$:\n2-цикл $x_1=-x_0$", transform=axes[1].transAxes, color=RED)
+    save("03_newton_1d.png")
     return thr
 
 
-# ================================================================ 03 четыре метода: логарифм ошибки
-def fig_rates_four(R):
+def errors_rosen(R):
     kg, pg = R["gd"]; kn, pn = R["newton"]; kd, pd = R["damped"]; kb, pb, nfb = R["bfgs"]
-    err = {k: np.linalg.norm(p - 1, axis=1) + 1e-17 for k, p in (("gd", pg), ("newton", pn), ("damped", pd), ("bfgs", pb))}
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.4))
-    ax = axes[0]
-    ax.plot(np.arange(41), np.log10(err["gd"][:41]), color=BLUE, label=f"спуск, backtracking ({kg} итераций)")
-    ax.plot(np.arange(len(pd)), np.log10(err["damped"]), "-s", ms=3.5, color=VIOLET, label=f"Ньютон с backtracking ({kd})")
-    ax.plot(np.arange(len(pb)), np.log10(err["bfgs"]), "-^", ms=3.5, color=AQUA, label=f"BFGS ({kb})")
-    ax.plot(np.arange(len(pn)), np.log10(err["newton"]), "-o", ms=4.5, color=ORANGE, label=f"чистый Ньютон ({kn})")
-    ax.set(xlabel="итерация $k$", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", xlim=(0, 40), ylim=(-12.5, 1.2),
-           title="Первые 40 итераций: прямая, загиб, обрыв")
-    ax.legend(loc="lower left", fontsize=8.5)
-    ax = axes[1]
-    ax.plot(np.arange(1, len(pg) + 1), np.log10(err["gd"]), color=BLUE)
-    ax.plot(np.arange(1, len(pd) + 1), np.log10(err["damped"]), "-s", ms=3, color=VIOLET)
-    ax.plot(np.arange(1, len(pb) + 1), np.log10(err["bfgs"]), "-^", ms=3, color=AQUA)
-    ax.plot(np.arange(1, len(pn) + 1), np.log10(err["newton"]), "-o", ms=4, color=ORANGE)
-    ax.set_xscale("log")
-    ax.set(xlabel="итерация $k$ (лог. шкала)", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", ylim=(-12.5, 1.2),
-           title="Все итерации: спуску нужно на три порядка больше")
-    save("03_rates_four.png")
+    return {k: np.linalg.norm(p - 1, axis=1) + 1e-17 for k, p in (("gd", pg), ("newton", pn), ("damped", pd), ("bfgs", pb))}
 
 
-# ================================================================ 04 бассейны Ньютона на Химмельблау
+# ================================================================ 04 спуск против чистого Ньютона
+def fig_rates_newton(R):
+    kg, _ = R["gd"]; kn, pn = R["newton"]; err = errors_rosen(R)
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(np.arange(41), np.log10(err["gd"][:41]), color=BLUE, label=f"градиентный спуск ({kg} итераций)")
+    ax.plot(np.arange(len(pn)), np.log10(err["newton"]), "-o", ms=6, color=ORANGE, label=f"чистый Ньютон ({kn})")
+    ax.annotate("модель врёт:\nошибка растёт", (2, np.log10(err["newton"][2])), (5.5, -1.6), color=ORANGE,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.annotate("обрыв: цифры удваиваются", (5, np.log10(err["newton"][5])), (8, -6), color=ORANGE,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.set(xlabel="итерация $k$", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", xlim=(0, 40), ylim=(-12.5, 1.4),
+           title="Розенброк, первые 40 итераций: прямая против обрыва")
+    ax.legend(loc="lower left")
+    save("04_rates_newton.png")
+
+
+# ================================================================ 05 бассейны Ньютона на Химмельблау
 def fig_basins():
     t0 = time.perf_counter()
     xs, idx, its, uniq, kinds = himmelblau_newton_basins()
@@ -424,7 +461,6 @@ def fig_basins():
     shares = {kind: np.mean([kinds[j] == kind for j in idx[ok]]) for kind in ("min", "saddle", "max")}
     assert ok.mean() > 0.999 and 0.6 < shares["min"] < 0.7 and 0.25 < shares["saddle"] < 0.36, (ok.mean(), shares)
     med = np.median(its[ok])
-    # цвета: минимумы — оттенки синего/зелёного, сёдла — оттенки оранжевого, максимум — красный
     palette = []
     mins = ["#2a78d6", "#1baf7a", "#4a3aa7", "#5fb8e8"]; sads = ["#eb6834", "#eda100", "#f3a35f", "#c9a227"]
     im = isd = 0
@@ -433,139 +469,172 @@ def fig_basins():
         elif kd == "saddle": palette.append(sads[isd]); isd += 1
         else: palette.append(RED)
     cmap = ListedColormap(palette)
-    fig, ax = plt.subplots(figsize=(8.6, 7.2))
+    fig, ax = plt.subplots(figsize=(9, 9.2))
     ax.imshow(np.where(idx >= 0, idx, np.nan), origin="lower", extent=(xs[0], xs[-1], xs[0], xs[-1]), cmap=cmap,
               vmin=-0.5, vmax=len(uniq) - 0.5, interpolation="nearest", alpha=0.85)
     X, Y = np.meshgrid(xs, xs)
     F = (X ** 2 + Y - 11) ** 2 + (X + Y ** 2 - 7) ** 2
     ax.contour(X, Y, F, levels=np.geomspace(1, 400, 9), colors="white", linewidths=0.5, alpha=0.6)
-    marker = {"min": ("*", 16, "white"), "saddle": ("s", 9, "white"), "max": ("X", 11, "white")}
+    marker = {"min": ("*", 18, "white"), "saddle": ("s", 10, "white"), "max": ("X", 12, "white")}
     for p, kd in zip(uniq, kinds):
         mk, ms, mec = marker[kd]
         ax.plot(*p, mk, ms=ms, color=INK, mec=mec, mew=1.2, zorder=7)
-    ax.plot([], [], "*", ms=12, color=INK, mec="white", label=f"минимумы — {shares['min']:.0%} стартов")
-    ax.plot([], [], "s", ms=8, color=INK, mec="white", label=f"сёдла — {shares['saddle']:.0%}")
-    ax.plot([], [], "X", ms=9, color=INK, mec="white", label=f"максимум — {shares['max']:.0%}")
-    ax.legend(loc="upper left", fontsize=9, facecolor="white", frameon=True, framealpha=0.85)
+    ax.plot([], [], "*", ms=13, color=INK, mec="white", label=f"минимумы — {shares['min']:.0%} стартов")
+    ax.plot([], [], "s", ms=9, color=INK, mec="white", label=f"сёдла — {shares['saddle']:.0%}")
+    ax.plot([], [], "X", ms=10, color=INK, mec="white", label=f"максимум — {shares['max']:.0%}")
+    ax.legend(loc="lower left", facecolor="white", frameon=True, framealpha=0.9)
     ax.set(xlabel="$x_1$", ylabel="$x_2$", aspect="equal",
-           title=f"Химмельблау: куда приходит чистый Ньютон из каждой точки (медиана — {med:.0f} итераций)")
+           title=f"Химмельблау: куда приходит чистый Ньютон (медиана — {med:.0f} итераций)")
     ax.grid(False)
-    save("04_basins.png")
+    save("05_basins.png")
     print(f"      бассейны: {time.perf_counter() - t0:.1f} с, сошлось {ok.mean():.4%}, доли {shares}")
     return shares, med
 
 
-# ================================================================ 05 где шаг Ньютона — не спуск
-def fig_descent_or_not(R):
-    kn, pn = R["newton"]
-    fig, ax = plt.subplots(figsize=(9.6, 5.8))
-    xlim, ylim = (-2.2, 2.2), (-1.2, 4.2)
-    rosen_contour(ax, xlim, ylim)
-    xs = np.linspace(*xlim, 400)
-    ax.fill_between(xs, xs ** 2 + 0.005, ylim[1], color=RED, alpha=0.08, zorder=0)
-    ax.plot(xs, xs ** 2 + 0.005, color=RED, lw=1, ls="--")
-    # где шаг Ньютона идёт ВВЕРХ (g^T p > 0): считаем на сетке
-    X, Y = np.meshgrid(np.linspace(*xlim, 441), np.linspace(*ylim, 541))
-    G1 = -2 * (1 - X) - 400 * X * (Y - X ** 2); G2 = 200 * (Y - X ** 2)
-    Hxx = 2 - 400 * Y + 1200 * X ** 2; Hxy = -400 * X; Hyy = 200.0
-    det = Hxx * Hyy - Hxy ** 2
-    with np.errstate(all="ignore"):
-        P1 = -(Hyy * G1 - Hxy * G2) / det; P2 = -(Hxx * G2 - Hxy * G1) / det
-    uphill = (G1 * P1 + G2 * P2) > 0
-    share_up, share_ind = uphill.mean(), (det < 0).mean()
-    assert 0.003 < share_up < 0.012 and 0.4 < share_ind < 0.55 and np.all(det[uphill] < 0), (share_up, share_ind)
-    ax.contourf(X, Y, uphill.astype(float), levels=[0.5, 1.5], colors=[RED], alpha=0.45, zorder=1)
-    ax.text(-2.1, 3.75, "светлая зона: гессиан индефинитен ($x_2>x_1^2+0.005$) —\nмодель седловая, шаг идёт в её седло, обычно всё ещё вниз\nтёмная полоса над дном: шаг Ньютона идёт ВВЕРХ ($g^\\top p>0$)",
-            color=RED, fontsize=9)
-    pts = [np.array(p) for p in ((-1.7, 1.2), (-1.06, 1.18), (1.0, 2.6), (0.5, -0.6), (1.5, 1.2))]
-    L = 0.75
-    for x in pts:
-        g = rosen_grad(x); H = rosen_hess(x); p = -np.linalg.solve(H, g)
-        down = g @ p < 0
-        arrow(ax, x, x - L * g / np.linalg.norm(g), BLUE, lw=1.8, ms=12)
-        arrow(ax, x, x + L * p / np.linalg.norm(p), ORANGE if down else RED, lw=2.2, ms=12)
-        ax.plot(*x, "o", color=INK, ms=6, zorder=7)
-        ax.annotate(f"$g^\\top p{'<' if down else '>'}0$: {'спуск' if down else 'ПОДЪЁМ'}", x, (x[0] + 0.1, x[1] - 0.38), fontsize=8.5,
-                    color=ORANGE if down else RED, fontweight="normal" if down else "bold")
-    assert rosen_grad(pts[1]) @ (-np.linalg.solve(rosen_hess(pts[1]), rosen_grad(pts[1]))) > 0
-    ax.plot([], [], color=BLUE, lw=2, label="антиградиент $-\\nabla f$ (нормирован)")
-    ax.plot([], [], color=ORANGE, lw=2, label="шаг Ньютона $p=-H^{-1}g$ (нормирован): спуск")
-    ax.plot([], [], color=RED, lw=2, label="шаг Ньютона: подъём")
-    ax.legend(loc="upper right", fontsize=8.5)
-    ax.set_title("Розенброк: шаг Ньютона гарантированно спуск только там, где $\\nabla^2f\\succ0$")
-    save("05_descent_or_not.png")
-    return share_up, share_ind
-
-
-# ================================================================ 06 секущая и BFGS учится эллипсу
-def fig_secant_bfgs():
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.6), gridspec_kw=dict(width_ratios=[1, 1.15]))
+# ================================================================ 06 чистый против демпфированного
+def fig_damped(R):
+    kn, pn = R["newton"]; kd, pd = R["damped"]; err = errors_rosen(R)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.3), gridspec_kw=dict(width_ratios=[1.1, 1]))
     ax = axes[0]
+    rosen_contour(ax, xlim=(-2.2, 2.2), ylim=(-3.5, 3.2))
+    ax.plot(pn[:, 0], pn[:, 1], "-o", color=ORANGE, ms=5, lw=1.6, label=f"чистый Ньютон: {kn}")
+    ax.plot(pd[:, 0], pd[:, 1], "-s", color=VIOLET, ms=4, lw=1.6, label=f"с правилом Армихо: {kd}")
+    ax.plot(*X0_ROSEN, "o", color=INK, ms=6, zorder=7)
+    ax.annotate("выброс", pn[2], (pn[2, 0] - 1.6, pn[2, 1] + 0.1), color=ORANGE)
+    ax.legend(loc="upper left")
+    ax.set_title("Пути: с выбросом и без")
+    ax = axes[1]
+    ax.plot(np.arange(len(pn)), np.log10(err["newton"]), "-o", ms=5, color=ORANGE, label=f"чистый ({kn})")
+    ax.plot(np.arange(len(pd)), np.log10(err["damped"]), "-s", ms=4, color=VIOLET, label=f"Армихо ({kd})")
+    ax.set(xlabel="итерация $k$", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", xlim=(0, 23), ylim=(-12.5, 1.4),
+           title="Ошибка: убывает на каждом шаге")
+    ax.legend(loc="lower left")
+    save("06_damped.png")
+
+
+# ================================================================ 07 модель-чаша и модель-седло
+def fig_bowl_saddle():
+    g = np.array([1.0, 2.0])
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.5))
+    lim = 3.2
+    P1, P2 = np.meshgrid(np.linspace(-lim, lim, 400), np.linspace(-lim, lim, 400))
+    for ax, B, title in ((axes[0], np.diag([1.0, 2.0]), "гессиан $\\succ0$: модель — чаша"),
+                         (axes[1], np.diag([1.0, -1.0]), "есть $\\lambda<0$: модель — седло")):
+        M = g[0] * P1 + g[1] * P2 + 0.5 * (B[0, 0] * P1 ** 2 + B[1, 1] * P2 ** 2)
+        p = -np.linalg.solve(B, g)
+        levels = np.sort(M[200, 200] + np.array([-4, -2.5, -1.2, -0.4, 0.4, 1.2, 2.5, 4, 6, 9]) + (g @ p) / 2)
+        ax.contour(P1, P2, M, levels=np.unique(levels), colors=ORANGE, linewidths=0.9, alpha=0.9)
+        ax.plot(0, 0, "o", color=INK, ms=8, zorder=8)
+        ax.annotate("$x_k$", (0, 0), (0.12, 0.18), color=INK)
+        d = -g / np.linalg.norm(g) * 1.3
+        arrow(ax, (0, 0), d, BLUE, lw=2)
+        ax.annotate("$-g$", d, (d[0] - 0.55, d[1] - 0.1), color=BLUE)
+        arrow(ax, (0, 0), p, ORANGE if g @ p < 0 else RED, lw=2.4)
+        if g @ p < 0:
+            assert np.allclose(p, [-1, -1]), p
+            ax.plot(*p, "s", color=ORANGE, ms=8, zorder=8)
+            ax.annotate("минимум модели:\n$g^\\top p<0$ — вниз", p, (p[0] - 2.0, p[1] - 1.5), color=ORANGE)
+        else:
+            assert np.allclose(p, [-1, 2]) and g @ p == 3, (p, g @ p)
+            ax.plot(*p, "D", color=RED, ms=8, zorder=8)
+            ax.annotate("седло модели:\n$g^\\top p=3>0$ — вверх", p, (p[0] - 2.1, p[1] + 0.5), color=RED)
+            tau = abs(np.linalg.eigvalsh(B)[0]) + 1e-3
+            preg = -np.linalg.solve(B + tau * np.eye(2), g)
+            assert g @ preg < 0, preg
+            dreg = preg / np.linalg.norm(preg) * 1.6
+            arrow(ax, (0, 0), dreg, AQUA, lw=2.4)
+            ax.annotate("$B_k=\\nabla^2f+\\tau I$:\n$g^\\top p<0$ — вниз", dreg, (dreg[0] + 0.15, dreg[1] - 0.7), color=AQUA)
+        ax.set(xlim=(-lim, lim), ylim=(-lim, lim), xlabel="$p_1$", ylabel="$p_2$", aspect="equal", title=title)
+        ax.grid(False)
+    save("07_bowl_saddle.png")
+
+
+# ================================================================ 08 секущая против касательной
+def fig_secant():
+    fig, ax = plt.subplots(figsize=(9, 4.4))
     F = lambda x: np.tanh(x); dF = lambda x: 1 / np.cosh(x) ** 2       # F = f' для f = ln cosh
     x0, x1 = 1.3, 0.8
     t = np.linspace(-1.1, 1.8, 400)
     ax.plot(t, F(t), color=INK, lw=2.2, label="$F(x)=f'(x)$ — ищем нуль")
     ax.axhline(0, color=GRAY, lw=0.8)
-    ax.plot(t, F(x1) + dF(x1) * (t - x1), color=ORANGE, lw=1.6, label="касательная в $x_1$: Ньютон, нужна $f''$")
+    ax.plot(t, F(x1) + dF(x1) * (t - x1), color=ORANGE, lw=1.8, label="касательная в $x_1$: Ньютон, нужна $f''$")
     slope = (F(x1) - F(x0)) / (x1 - x0)
-    ax.plot(t, F(x1) + slope * (t - x1), color=AQUA, lw=1.6, ls="--", label="секущая через $x_0,x_1$: $f''\\approx y/s$")
+    ax.plot(t, F(x1) + slope * (t - x1), color=AQUA, lw=1.8, ls="--", label="секущая через $x_0,x_1$: $f''\\approx y/s$")
     ax.plot([x0, x1], [F(x0), F(x1)], "o", color=INK, ms=7, zorder=7)
     xn_newton, xn_secant = x1 - F(x1) / dF(x1), x1 - F(x1) / slope
     ax.plot(xn_newton, 0, "s", color=ORANGE, ms=8, zorder=7); ax.plot(xn_secant, 0, "s", color=AQUA, ms=8, zorder=7)
-    ax.annotate("$x_0$", (x0, F(x0)), (x0 + 0.05, F(x0) - 0.18), fontsize=10)
-    ax.annotate("$x_1$", (x1, F(x1)), (x1 + 0.05, F(x1) - 0.18), fontsize=10)
-    ax.text(0.04, 0.80, "$s=x_1-x_0$,  $y=F(x_1)-F(x_0)$,  $f''\\approx y/s$", transform=ax.transAxes, fontsize=9.5, color=AQUA)
+    ax.annotate("$x_0$", (x0, F(x0)), (x0 + 0.05, F(x0) - 0.2))
+    ax.annotate("$x_1$", (x1, F(x1)), (x1 + 0.05, F(x1) - 0.2))
+    ax.text(0.03, 0.84, "$s=x_1-x_0$,  $y=F(x_1)-F(x_0)$,  $f''\\approx y/s$", transform=ax.transAxes, color=AQUA)
     ax.set(xlim=(-1.1, 1.8), ylim=(-0.9, 1.1), xlabel="$x$", title="Секущее уравнение: кривизна из двух градиентов")
-    ax.legend(loc="lower right", fontsize=8.5)
+    ax.legend(loc="lower right")
+    save("08_secant.png")
 
-    ax = axes[1]
+
+# ================================================================ 09 BFGS учится эллипсу на квадратичной
+def fig_bfgs_ellipses():
     Q = np.diag([1.0, 50.0])
     xq, kq, pq, _ = bfgs(lambda x: 0.5 * x @ Q @ x, lambda x: Q @ x, [50.0, 1.0], tol=1e-10, Q=Q)
-    # восстанавливаем H_k по шагам, чтобы нарисовать эллипсы модели
-    Hs = [np.eye(2)]
+    Hs = [np.eye(2)]                                      # восстанавливаем H_k по шагам
     for k in range(len(pq) - 1):
         s = pq[k + 1] - pq[k]; y = Q @ s; rho = 1 / (s @ y); I = np.eye(2)
         Hs.append((I - rho * np.outer(s, y)) @ Hs[-1] @ (I - rho * np.outer(y, s)) + rho * np.outer(s, s))
     assert kq == 2 and np.allclose(Hs[2], np.linalg.inv(Q), atol=1e-10), (kq, Hs[2])
     th = np.linspace(0, 2 * np.pi, 300); circ = np.c_[np.cos(th), np.sin(th)]
+
     def ellipse(B):       # {p : p^T B p = 1}
         L = np.linalg.cholesky(np.linalg.inv(B)); return circ @ L.T
+
+    fig, ax = plt.subplots(figsize=(9, 5.2))
     e_true = ellipse(Q)
     for k, (Hk, col, lab) in enumerate(zip(Hs, (GRAY, VIOLET, ORANGE), ("$B_0=I$: круг", "$B_1$: кривизна вдоль первого шага", "$B_2=Q$: совпадение"))):
         e = ellipse(np.linalg.inv(Hk))
         ax.plot(e[:, 0], e[:, 1], color=col, lw=2.2 if k < 2 else 2.8, ls="-" if k < 2 else "--", label=lab)
     ax.plot(e_true[:, 0], e_true[:, 1], color=INK, lw=1.2, label="истинный гессиан $Q$")
     ax.set(xlabel="$p_1$", ylabel="$p_2$", aspect="equal", xlim=(-1.3, 1.3), ylim=(-1.3, 1.3),
-           title=f"$\\frac{{1}}{{2}}(x_1^2+50x_2^2)$: эллипсы $p^\\top B_kp=1$ — BFGS за {kq} шага учит $Q^{{-1}}$")
-    ax.legend(loc="upper right", fontsize=8.5)
-    save("06_secant_bfgs.png")
+           title=f"$\\frac{{1}}{{2}}(x_1^2+50x_2^2)$: BFGS за {kq} шага учит $Q^{{-1}}$")
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0))
+    save("09_bfgs_ellipses.png")
     return Hs
 
 
-# ================================================================ 07 Гаусс–Ньютон на синусе
+# ================================================================ 10 спуск, BFGS, Ньютон
+def fig_rates_three(R):
+    kg, _ = R["gd"]; kn, pn = R["newton"]; kb, pb, nfb = R["bfgs"]; err = errors_rosen(R)
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(np.arange(41), np.log10(err["gd"][:41]), color=BLUE, label=f"градиентный спуск ({kg}): прямая")
+    ax.plot(np.arange(len(pb)), np.log10(err["bfgs"]), "-^", ms=5, color=AQUA, label=f"BFGS ({kb}): загиб")
+    ax.plot(np.arange(len(pn)), np.log10(err["newton"]), "-o", ms=5.5, color=ORANGE, label=f"чистый Ньютон ({kn}): обрыв")
+    ax.set(xlabel="итерация $k$", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", xlim=(0, 40), ylim=(-12.5, 1.4),
+           title="Розенброк: линейная, сверхлинейная, квадратичная")
+    ax.legend(loc="lower left")
+    save("10_rates_three.png")
+
+
+# ================================================================ 11 Гаусс–Ньютон на синусе
 def fig_gn_sine(S):
     t, y = S["t"], S["y"]; kgn, pgn, xgn = S["gn"]; kgd, pgd = S["gd"]; knw, pnw, xnw = S["newton"]; f = S["f"]
-    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.4), gridspec_kw=dict(width_ratios=[1.2, 1]))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.3), gridspec_kw=dict(width_ratios=[1.15, 1]))
     ax = axes[0]
     tt = np.linspace(0, 2 * np.pi, 400)
     ax.plot(t, y, "o", ms=3.5, color=INK, alpha=0.7, label="данные")
-    ax.plot(tt, xgn[0] * np.sin(xgn[1] * tt + xgn[2]), color=AQUA, lw=2.4, label=f"Гаусс–Ньютон, {kgn} итераций: $f^*={f(xgn):.4f}$")
+    ax.plot(tt, xgn[0] * np.sin(xgn[1] * tt + xgn[2]), color=AQUA, lw=2.4, label=f"Гаусс–Ньютон, {kgn}: $f^*={f(xgn):.4f}$")
     ax.plot(tt, X0_SINE[0] * np.sin(X0_SINE[1] * tt + X0_SINE[2]), color=GRAY, lw=1.2, ls=":", label="старт $(1,\\,3,\\,0)$")
-    ax.plot(tt, xnw[0] * np.sin(xnw[1] * tt + xnw[2]), color=RED, lw=2, ls="--", label=f"Ньютон, {knw} итераций: $x_1=0$, $f={f(xnw):.1f}$")
-    ax.set(xlabel="$t$", ylabel="$y$", ylim=(-3.2, 4.0), title="Из одного старта — к разным стационарным точкам")
-    ax.legend(loc="upper right", fontsize=8.5)
+    ax.plot(tt, xnw[0] * np.sin(xnw[1] * tt + xnw[2]), color=RED, lw=2, ls="--", label=f"Ньютон, {knw}: $x_1=0$, $f={f(xnw):.0f}$")
+    ax.set(xlabel="$t$", ylabel="$y$", ylim=(-3.2, 4.6), title="Один старт — разные стационарные точки")
+    ax.legend(loc="upper right")
     ax = axes[1]
     egn = np.linalg.norm(pgn - xgn, axis=1) + 1e-17; egd = np.linalg.norm(pgd - xgn, axis=1) + 1e-17
-    ax.plot(np.arange(1, len(egd) + 1), np.log10(egd), color=BLUE, label=f"спуск, backtracking: {kgd} итераций")
+    ax.plot(np.arange(1, len(egd) + 1), np.log10(egd), color=BLUE, label=f"спуск: {kgd}")
     ax.plot(np.arange(1, len(egn) + 1), np.log10(egn), "-o", ms=5, color=AQUA, label=f"Гаусс–Ньютон: {kgn}")
     ax.set_xscale("log")
     ax.set(xlabel="итерация $k$ (лог. шкала)", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", ylim=(-7, 0.6),
-           title="Невязки малы — Гаусс–Ньютон почти как Ньютон")
-    ax.legend(loc="lower left", fontsize=8.5)
-    save("07_gn_sine.png")
+           title="Невязки малы — почти Ньютон")
+    ax.legend(loc="lower left")
+    save("11_gn_sine.png")
 
 
-# ================================================================ 08 цепь: итерации от N
+# ================================================================ 12 цепь: итерации от N
 def fig_chain_methods():
     Ns = (10, 20, 40, 80, 160)
     rows = []
@@ -584,19 +653,20 @@ def fig_chain_methods():
     kg40 = rows[2, 1]; kb = rows[:, 2]
     assert abs(kg40 - 10575) < 110, kg40
     assert np.array_equal(kb, [5, 10, 20, 40, 80]), kb
-    assert 60 <= rows[2, 3] <= 90, rows[2, 3]
-    fig, ax = plt.subplots(figsize=(8.6, 4.6))
+    assert 60 <= rows[2, 3] <= 90, rows[2, 3]                 # L-BFGS: «75»
+    assert 55 <= rows[2, 6] <= 80, rows[2, 6]                 # scipy BFGS с условием Вольфе: «66»
+    fig, ax = plt.subplots(figsize=(9, 4.8))
     ax.plot(Ns, rows[:, 1], "o-", color=BLUE, label="градиентный спуск, шаг $1/L$  ($\\propto\\kappa\\sim N^2$)")
     ax.plot(Ns, rows[:, 3], "^-", color=AQUA, label="L-BFGS, память 5 (SciPy)")
     ax.plot(Ns, rows[:, 2], "s-", color=VIOLET, label="BFGS, точный шаг  ($=N/2$)")
-    ax.plot(Ns, np.ones(len(Ns)), "*-", color=ORANGE, ms=10, label="Ньютон: один `solve`")
+    ax.plot(Ns, np.ones(len(Ns)), "*-", color=ORANGE, ms=11, label="Ньютон: один `solve`")
     for N, kg, kb_, kl, *_ in rows:
-        ax.annotate(f"{int(kg):,}".replace(",", " "), (N, kg), (0, 6), textcoords="offset points", ha="center", fontsize=8, color=BLUE)
+        ax.annotate(f"{int(kg):,}".replace(",", " "), (N, kg), (0, 7), textcoords="offset points", ha="center", color=BLUE, fontsize=10)
     ax.set_xscale("log", base=2); ax.set_yscale("log")
     ax.set(xlabel="число грузов $N$ (переменных — $2N$)", ylabel="итераций до $\\Vert\\nabla E\\Vert\\leq10^{-6}$",
-           xticks=Ns, xticklabels=[str(n) for n in Ns], title="Цепь: чем больше кривизны знает метод, тем меньше итераций")
-    ax.legend(loc="upper left", fontsize=8.5)
-    save("08_chain_methods.png")
+           xticks=Ns, xticklabels=[str(n) for n in Ns], title="Цепь: чем больше кривизны знает $B_k$, тем меньше итераций")
+    ax.legend(loc="upper left")
+    save("12_chain_methods.png")
     print(f"      цепь всего: {time.perf_counter() - t_total:.1f} с")
     return rows
 
@@ -607,17 +677,20 @@ if __name__ == "__main__":
     R = runs_rosen()
     S = runs_sine()
     fig_hooks(R, S)
-    fig_quadratic_model(R)
+    fig_model_1d()
+    fig_model_ellipses(R)
     thr = fig_newton_1d()
-    fig_rates_four(R)
+    fig_rates_newton(R)
     shares, med = fig_basins()
-    share_up, share_ind = fig_descent_or_not(R)
-    Hs = fig_secant_bfgs()
+    fig_damped(R)
+    fig_bowl_saddle()
+    fig_secant()
+    Hs = fig_bfgs_ellipses()
+    fig_rates_three(R)
     fig_gn_sine(S)
     rows = fig_chain_methods()
-    kg, _ = R["gd"]; kn, _ = R["newton"]; kd, _ = R["damped"]; kb, _, nfb = R["bfgs"]
-    print(f"проверки: Розенброк — спуск {kg}, Ньютон {kn}, демпфированный {kd}, BFGS {kb} ({nfb} вызовов f);")
+    kg, _ = R["gd"]; kn, _ = R["newton"]; kd, _ = R["damped"]; kb, _, nfb = R["bfgs"]; sb, sf, sl = R["scipy"]
+    print(f"проверки: Розенброк — спуск {kg}, Ньютон {kn}, демпфированный {kd}, BFGS {kb} ({nfb} вызовов f), scipy BFGS {sb} ({sf}), L-BFGS-B {sl};")
     print(f"          синус — Гаусс–Ньютон {S['gn'][0]}, спуск {S['gd'][0]}, Ньютон {S['newton'][0]} (x1 = {S['newton'][2][0]:.1e});")
-    print(f"          Розенброк: гессиан индефинитен на {share_ind:.0%} окна, шаг Ньютона вверх — на {share_up:.1%};")
     print(f"          порог ln cosh {thr:.4f}; Химмельблау: минимумы {shares['min']:.1%}, сёдла {shares['saddle']:.1%}, максимум {shares['max']:.1%}")
     print(f"готово за {time.perf_counter() - t_start:.1f} с")

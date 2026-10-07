@@ -10,7 +10,7 @@
 Рисовальщики (принимают ax=None, возвращают ax): plot_rosen_path(paths, labels, ax, ...),
         plot_errors(errs, labels, ax, logx).
 
-Файл генерируется скриптом build_lecture05.py из build_demo05.py — не правьте руками.
+Файл генерируется скриптом scripts/build_lecture05.py из scripts/build_demo05.py — не правьте руками.
 """
 
 import time
@@ -44,7 +44,7 @@ def gd(f, grad, x0, alpha=None, tol=1e-6, maxit=100_000, c=1e-4):
 
 
 def newton(grad, hess, x0, tol=1e-10, maxit=50):
-    """Чистый метод Ньютона: x <- x - H^{-1} g, без линейного поиска. Возвращает (x, итераций, путь)."""
+    """Чистый метод Ньютона: x <- x - H^{-1} g, длина шага всегда 1. Возвращает (x, итераций, путь)."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
         g = grad(x)
@@ -55,9 +55,9 @@ def newton(grad, hess, x0, tol=1e-10, maxit=50):
 
 
 def newton_damped(f, grad, hess, x0, tol=1e-10, maxit=200, c=1e-4):
-    """Демпфированный Ньютон: направление Ньютона, длина шага — backtracking по Армихо.
-    Если гессиан не положительно определён и направление не является спуском, матрица
-    регуляризуется: H + (|lambda_min| + 1e-3) I. Возвращает (x, итераций, путь)."""
+    """Демпфированный Ньютон: направление Ньютона, длина шага — по правилу Армихо.
+    Если гессиан индефинитен и направление не является спуском, матрица
+    сдвигается: H + (|lambda_min| + 1e-3) I. Возвращает (x, итераций, путь)."""
     x = np.asarray(x0, float).copy(); path = [x.copy()]
     for k in range(maxit):
         g = grad(x)

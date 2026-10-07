@@ -1,17 +1,17 @@
 """Собирает конспект-ноутбук lecture05.ipynb: текст из lecture05.md плюс код демонстраций.
 
-    uv run python lectures/lecture05/build_lecture05.py
+    uv run python lectures/lecture05/scripts/build_lecture05.py
     uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture05/lecture05.ipynb
 
 Текст режется на ячейки так же, как в tools/md2nb.py (по заголовкам ## и ###).
 Ячейки демонстраций берутся из build_demo05.py (тот же код, что в demo05.ipynb)
-и вставляются в разделы, к которым относятся:
+и вставляются в разделы, к которым относятся — только две, чтобы конспект
+не перегружать кодом:
 
-    (0) три задачи-крючка             -> после 1.2, перед 1.3
-    (a) Ньютон на Розенброке          -> после раздела 3, перед 4
+    (a) Ньютон и демпфирование        -> после раздела 3, перед 4
     (b) BFGS                          -> после раздела 4, перед 5
-    (c) Гаусс–Ньютон на синусе        -> после раздела 5, перед 6
-    (d) биография цепи                -> после раздела 6, перед 7
+
+Части (0), (c), (d) остаются только в demo05.ipynb.
 
 Заголовки частей «## (a) …» становятся «### Демо (a). …», чтобы не ломать
 нумерацию разделов конспекта. Вторая ячейка demo05 (импорты, методы, задачи,
@@ -25,23 +25,21 @@ from pathlib import Path
 
 import nbformat as nbf
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent            # scripts/
+LECTURE = HERE.parent                             # lectures/lecture05/
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE.parent.parent / "tools"))
+sys.path.insert(0, str(LECTURE.parent.parent / "tools"))
 
 from md2nb import split_cells  # noqa: E402
 import build_demo05  # noqa: E402  (импорт собирает список ячеек, файл не пишет)
 
-MD = HERE / "lecture05.md"
-OUT = HERE / "lecture05.ipynb"
+MD = LECTURE / "lecture05.md"
+OUT = LECTURE / "lecture05.ipynb"
 
 # где вставлять какую часть: часть -> префикс заголовка ячейки конспекта, ПЕРЕД которой она идёт
 PLACEMENT = [
-    ("0", "### 1.3."),
     ("a", "## 4."),
     ("b", "## 5."),
-    ("c", "## 6."),
-    ("d", "## 7."),
 ]
 PART_HEAD = re.compile(r"^## \((\w)\) (.*)$", re.M)
 
@@ -76,7 +74,7 @@ def main() -> None:
 
     # вспомогательный код (палитра, gd, newton) — в модуль рядом с ноутбуком
     helper_body = setup.source.replace("%matplotlib inline\n\n", "", 1)
-    (HERE / "l5helpers.py").write_text(
+    (LECTURE / "l5helpers.py").write_text(
         '"""Вспомогательный код демонстраций лекции 5.\n\n'
         'Методы: gd(f, grad, x0, alpha=None, tol, maxit, c) — градиентный спуск (лекция 4);\n'
         '        newton(grad, hess, x0, tol, maxit) — чистый Ньютон;\n'
@@ -87,7 +85,7 @@ def main() -> None:
         '        sine_data() -> (t, y, starts); sine_problem(t, y) -> (resid, jac, f, grad, hess); X0_SINE.\n'
         'Рисовальщики (принимают ax=None, возвращают ax): plot_rosen_path(paths, labels, ax, ...),\n'
         '        plot_errors(errs, labels, ax, logx).\n\n'
-        'Файл генерируется скриптом build_lecture05.py из build_demo05.py — не правьте руками.\n"""\n\n'
+        'Файл генерируется скриптом scripts/build_lecture05.py из scripts/build_demo05.py — не правьте руками.\n"""\n\n'
         + helper_body + "\n",
         encoding="utf-8",
     )
@@ -96,9 +94,10 @@ def main() -> None:
     for i, src in enumerate(text_cells):
         if i == 1:  # после шапки конспекта, перед «## 1.» — короткая ячейка с импортом
             out.append(nbf.v4.new_markdown_cell(
-                "> **Код в этом ноутбуке.** Демонстрации из [`demo05.ipynb`](demo05.ipynb) вставлены "
-                "в те разделы, к которым относятся; заголовки — «Демо (0)»–«Демо (d)». При чтении их "
-                "можно пропускать, на лекции — запускать по ходу. Вспомогательный код (палитра, методы "
+                "> **Код в этом ноутбуке.** Две демонстрации из [`demo05.ipynb`](demo05.ipynb) вставлены "
+                "в те разделы, к которым относятся: «Демо (a)» — Ньютон и демпфирование — после раздела 3, "
+                "«Демо (b)» — BFGS — после раздела 4; остальные части (задачи, Гаусс–Ньютон, цепь) — только в "
+                "`demo05.ipynb`. При чтении демо можно пропускать, на лекции — запускать по ходу. Вспомогательный код (палитра, методы "
                 "`gd`, `newton`, `newton_damped`, `bfgs`, `gauss_newton`, задачи и рисовальщики) вынесен в "
                 "[`l5helpers.py`](l5helpers.py); его подключает ячейка ниже."
             ))
@@ -110,7 +109,7 @@ def main() -> None:
                 out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"
                            else nbf.v4.new_markdown_cell(c.source) for c in parts.pop(part))
         out.append(nbf.v4.new_markdown_cell(src))
-    assert not parts, f"не вставлены части {sorted(parts)}"
+    assert not set(parts) & {part for part, _ in PLACEMENT}, f"не вставлены части {sorted(parts)}"
 
     nb = nbf.v4.new_notebook(cells=out)
     nb.metadata.update({

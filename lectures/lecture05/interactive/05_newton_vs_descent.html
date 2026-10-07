@@ -59,7 +59,7 @@ small.src { color: var(--muted); }
     </div>
     <div class="panel">
       <h2>Розенброк: f = (1−x₁)² + 100(x₂−x₁²)²</h2>
-      <p class="what">Что увидеть: спуск ползёт по дну долины тысячами шагов, Ньютон делает семь — и один из них улетает за край; BFGS между ними.</p>
+      <p class="what">Что увидеть: спуск ползёт вдоль параболы x₂ = x₁² тысячами шагов, Ньютон делает семь — и один из них улетает за край; BFGS между ними.</p>
       <div class="row"><label for="m1">Метод</label>
         <select id="m1">
           <option value="gd">спуск, backtracking (tol 10⁻⁶)</option>
@@ -78,7 +78,7 @@ small.src { color: var(--muted); }
         <tr><td>итераций до сходимости</td><td id="b1total">—</td></tr>
       </table>
       <p class="expect">Ожидается при старте (−1.2, 1): спуск 13 756 · Ньютон 7 · Ньютон с backtracking 22 · BFGS 34.</p>
-      <p class="hint">Попробуйте: клик по холсту задаёт старт; клавиши ← → — шаг назад/вперёд, пробел — запустить. Стартуйте над дном долины (x₂ > x₁² + 0.005) и посмотрите, куда идёт чистый Ньютон.</p>
+      <p class="hint">Попробуйте: клик по холсту задаёт старт; клавиши ← → — шаг назад/вперёд, пробел — запустить. Стартуйте выше параболы x₂ = x₁² + 0.005, где гессиан индефинитен и посмотрите, куда идёт чистый Ньютон.</p>
     </div>
   </section>
 
@@ -215,7 +215,7 @@ small.src { color: var(--muted); }
   }
   function draw1() {
     const col = C(); if (!heat) makeHeat(); ctx1.putImageData(heat, 0, 0);
-    // дно долины и граница индефинитности
+    // парабола x₂ = x₁² + 0.005: выше неё у гессиана есть отрицательное собственное число
     ctx1.strokeStyle = col.red; ctx1.setLineDash([4, 4]); ctx1.lineWidth = 1; ctx1.beginPath();
     for (let i = 0; i <= 200; i++) { const x = view1.xmin + i / 200 * (view1.xmax - view1.xmin); const p = toPx1([x, x * x + 0.005]); i ? ctx1.lineTo(p[0], p[1]) : ctx1.moveTo(p[0], p[1]); }
     ctx1.stroke(); ctx1.setLineDash([]);
