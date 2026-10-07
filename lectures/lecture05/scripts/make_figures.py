@@ -20,8 +20,10 @@ bfgs, gauss_newton) определены здесь тем же кодом, чт
   08_secant           касательная против секущей на графике f'
   09_bfgs_ellipses    BFGS на квадратичной: B_0 = I, B_1, B_2 = Q
   10_rates_three      спуск, BFGS, Ньютон: прямая, загиб, обрыв
-  11_gn_sine          Гаусс–Ньютон на синусе: кривые и ошибки
-  12_chain_methods    цепь: итерации от N для четырёх методов
+  11_residuals        синус: невязки как отрезки и три столбца якобиана
+  12_gn_sine          Гаусс–Ньютон на синусе: кривые и ошибки
+  13_lm_steps         Левенберг–Марквардт: шаг при разных λ и путь с подбором λ_k
+  14_chain_methods    цепь: итерации от N для трёх методов
 """
 
 import time
@@ -306,10 +308,8 @@ def runs_rosen():
     assert all(np.linalg.eigvalsh(rosen_hess(x))[0] > 0 for x in pn), "гессиан на пути Ньютона должен быть > 0"
     # SciPy с тем же допуском: числа раздела 4.4 и таблицы раздела 6
     r_b = minimize(rosen, X0_ROSEN, jac=rosen_grad, method="BFGS", options={"gtol": 1e-6})
-    r_l = minimize(rosen, X0_ROSEN, jac=rosen_grad, method="L-BFGS-B", options={"gtol": 1e-6})
     assert (r_b.nit, r_b.nfev) == (33, 40), (r_b.nit, r_b.nfev)
-    assert r_l.nit == 36, r_l.nit
-    return dict(gd=(kg, pg), newton=(kn, pn), damped=(kd, pd), bfgs=(kb, pb, nfb), scipy=(r_b.nit, r_b.nfev, r_l.nit))
+    return dict(gd=(kg, pg), newton=(kn, pn), damped=(kd, pd), bfgs=(kb, pb, nfb), scipy=(r_b.nit, r_b.nfev))
 
 
 def runs_sine():
@@ -443,7 +443,7 @@ def fig_rates_newton(R):
     ax.plot(np.arange(len(pn)), np.log10(err["newton"]), "-o", ms=6, color=ORANGE, label=f"чистый Ньютон ({kn})")
     ax.annotate("модель врёт:\nошибка растёт", (2, np.log10(err["newton"][2])), (5.5, -1.6), color=ORANGE,
                 arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
-    ax.annotate("обрыв: цифры удваиваются", (5, np.log10(err["newton"][5])), (8, -6), color=ORANGE,
+    ax.annotate("обрыв: $e_{k+1}\\approx C\\,e_k^2$", (5, np.log10(err["newton"][5])), (8, -6), color=ORANGE,
                 arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
     ax.set(xlabel="итерация $k$", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", xlim=(0, 40), ylim=(-12.5, 1.4),
            title="Розенброк, первые 40 итераций: прямая против обрыва")
@@ -611,7 +611,119 @@ def fig_rates_three(R):
     save("10_rates_three.png")
 
 
-# ================================================================ 11 Гаусс–Ньютон на синусе
+# ================================================================ 11 невязки и столбцы якобиана
+def fig_residuals(S):
+    t, y, resid, jac, f = S["t"], S["y"], S["resid"], S["jac"], S["f"]
+    x0 = X0_SINE; r0 = resid(x0); J0 = jac(x0)
+    assert r0.shape == (60,) and J0.shape == (60, 3), (r0.shape, J0.shape)
+    assert abs(0.5 * (r0 @ r0) - f(x0)) < 1e-12
+    phi = lambda tau: x0[0] * np.sin(x0[1] * tau + x0[2])
+    tt = np.linspace(0, 2 * np.pi, 400)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.3), gridspec_kw=dict(width_ratios=[1.15, 1]))
+    ax = axes[0]
+    ax.vlines(t, y, phi(t), color=ORANGE, lw=1.6, alpha=0.9, label="невязки $r_i=\\varphi(t_i;x)-y_i$")
+    ax.plot(tt, phi(tt), color=BLUE, lw=2.2, label="модель $\\varphi(t;x)$ в старте $(1,3,0)$")
+    ax.plot(t, y, "o", ms=3.8, color=INK, label="данные $(t_i,y_i)$, $m=60$")
+    i = int(np.argmax(np.abs(r0))); ym = 0.5 * (y[i] + phi(t[i]))
+    ax.annotate(f"$r_{{{i + 1}}}={r0[i]:.2f}$", (t[i], ym), (t[i] + 0.75, 2.25), color=ORANGE,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.set(xlabel="$t$", ylabel="$y$", ylim=(-3.4, 4.6), title=f"$f=\\frac{{1}}{{2}}\\sum_i r_i^2={f(x0):.1f}$ в старте")
+    ax.legend(loc="upper right", fontsize=10)
+    ax = axes[1]
+    s, c = np.sin(x0[1] * tt + x0[2]), np.cos(x0[1] * tt + x0[2])
+    ax.plot(tt, s, color=BLUE, label="$\\partial\\varphi/\\partial x_1=\\sin(x_2t+x_3)$")
+    ax.plot(tt, x0[0] * tt * c, color=AQUA, label="$\\partial\\varphi/\\partial x_2=x_1t\\cos(x_2t+x_3)$")
+    ax.plot(tt, x0[0] * c, color=VIOLET, label="$\\partial\\varphi/\\partial x_3=x_1\\cos(x_2t+x_3)$")
+    ax.plot(t, J0[:, 1], "o", ms=3, color=AQUA, alpha=0.6)
+    ax.set(xlabel="$t$", ylabel="отклик кривой на параметр", ylim=(-7.2, 9.5), title="Столбцы $J$ ($60\\times3$): строка — точка $t_i$")
+    ax.legend(loc="upper left", fontsize=10)
+    save("11_residuals.png")
+
+
+# ================================================================ 13 Левенберг–Марквардт: λ укорачивает и поворачивает шаг
+def lm(resid, jac, x0, tol=1e-6, maxit=100):
+    """Левенберг–Марквардт по алгоритму §5.3 (правило ρ). Возвращает (путь, λ принятых шагов, итераций, отвергнуто)."""
+    x = np.asarray(x0, float).copy(); r = resid(x); J = jac(x)
+    lam = 1e-3 * np.max(np.diag(J.T @ J)); path = [x.copy()]; lam_used = []; rejected = 0
+    for k in range(maxit):
+        g = J.T @ r
+        if np.linalg.norm(g) <= tol:
+            return np.array(path), np.array(lam_used), k, rejected
+        p = np.linalg.solve(J.T @ J + lam * np.eye(len(x)), -g)
+        f_old, f_new = 0.5 * (r @ r), 0.5 * np.sum(resid(x + p) ** 2)
+        pred = f_old - 0.5 * np.sum((r + J @ p) ** 2)              # L(0) - L(p) >= 0
+        rho = (f_old - f_new) / pred if pred > 0 else -1.0
+        if rho > 0:
+            x = x + p; r = resid(x); J = jac(x); path.append(x.copy()); lam_used.append(lam)
+            if rho > 0.75: lam /= 3
+            elif rho < 0.25: lam *= 2
+        else:
+            lam *= 2; rejected += 1
+    return np.array(path), np.array(lam_used), maxit, rejected
+
+
+def fig_lm_steps(S):
+    resid3, jac3, xstar, t, y = S["resid"], S["jac"], S["gn"][2], S["t"], S["y"]
+    ph = xstar[2]                                       # фаза зафиксирована в решении: срез по (амплитуда, частота)
+    resid = lambda x: resid3(np.r_[x, ph]); jac = lambda x: jac3(np.r_[x, ph])[:, :2]
+    f = lambda x: 0.5 * np.sum(resid(x) ** 2)
+    x0 = np.array([0.5, 3.15]); f0 = f(x0)
+    J0, r0 = jac(x0), resid(x0); g0 = J0.T @ r0
+    lams_show = (0.0, 10.0, 100.0, 1000.0)
+    steps = {lam: np.linalg.solve(J0.T @ J0 + lam * np.eye(2), -g0) for lam in lams_show}
+    fs = {lam: f(x0 + p) for lam, p in steps.items()}
+    assert abs(f0 - 42.6) < 0.1 and abs(np.linalg.norm(steps[0.0]) - 1.47) < 0.02, (f0, np.linalg.norm(steps[0.0]))
+    assert fs[0.0] > fs[10.0] > f0 > fs[1000.0] > fs[100.0], (f0, fs)   # числа §5.3: 95 и 64 — вверх, 39 и 29 — вниз
+    assert abs(fs[0.0] - 95) < 1 and abs(fs[10.0] - 64) < 1 and abs(fs[100.0] - 29) < 1 and abs(fs[1000.0] - 39) < 1, fs
+    path_lm, lam_used, k_lm, rej = lm(resid, jac, x0)
+    assert k_lm == 19 and rej == 9 and np.allclose(path_lm[-1], xstar[:2], atol=1e-3), (k_lm, rej, path_lm[-1])
+    assert 50 <= lam_used.max() <= 56 and lam_used[-1] < 0.1, (lam_used.max(), lam_used[-1])   # λ: 0.1 -> 53 -> к нулю
+    path_gn = [x0.copy()]; x = x0.copy()
+    for _ in range(30):
+        x = x + np.linalg.lstsq(jac(x), -resid(x), rcond=None)[0]; path_gn.append(x.copy())
+    path_gn = np.array(path_gn)
+    assert f(path_gn[-1]) > 50, f(path_gn[-1])                         # чистый Гаусс–Ньютон не сошёлся
+
+    def contours(ax, a_lim, w_lim):
+        A, W = np.meshgrid(np.linspace(*a_lim, 240), np.linspace(*w_lim, 240))
+        R = A[..., None] * np.sin(W[..., None] * t + ph) - y
+        F = 0.5 * np.sum(R ** 2, axis=-1)
+        ax.contour(A, W, np.log10(F), levels=np.linspace(0.15, 2.2, 15), colors=GRAY, linewidths=0.7, alpha=0.7)
+        ax.plot(*xstar[:2], "*", color=RED, ms=14, zorder=8, label="минимум среза, $f^*=1.14$")
+        ax.set(xlim=a_lim, ylim=w_lim, xlabel="амплитуда $x_1$", ylabel="частота $x_2$"); ax.grid(False)
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.5))
+    ax = axes[0]
+    contours(ax, (-0.3, 2.6), (2.3, 3.6))
+    colors = {0.0: RED, 10.0: ORANGE, 100.0: AQUA, 1000.0: VIOLET}
+    names = {0.0: "$\\lambda=0$ (Гаусс–Ньютон)", 10.0: "$\\lambda=10$", 100.0: "$\\lambda=100$", 1000.0: "$\\lambda=1000$"}
+    for lam in lams_show:
+        p = steps[lam]
+        arrow(ax, x0, x0 + p, colors[lam], lw=2.2)
+        ax.plot([], [], color=colors[lam], lw=2.2, label=f"{names[lam]}: $f={fs[lam]:.0f}$" + (", шаг $0.06$" if lam == 1000.0 else ""))
+    ax.plot(*(x0 + steps[1000.0]), "o", color=VIOLET, ms=5, zorder=10)
+    d = -g0 / np.linalg.norm(g0) * 0.4
+    arrow(ax, x0, x0 + d, BLUE, lw=1.6, linestyle="--")
+    ax.annotate("$-\\nabla f$", x0 + d, (x0[0] + d[0] - 0.5, x0[1] + d[1] - 0.02), color=BLUE)
+    ax.plot(*x0, "o", color=INK, ms=7, zorder=9)
+    ax.annotate(f"старт, $f={f0:.0f}$", x0, (x0[0] - 0.7, x0[1] + 0.14), color=INK)
+    ax.set_title("Один старт, четыре $\\lambda$: короче и к антиградиенту")
+    ax.legend(loc="lower right", fontsize=10)
+    ax = axes[1]
+    contours(ax, (-0.8, 2.6), (2.3, 4.25))
+    ax.plot(path_gn[:, 0], path_gn[:, 1], "-o", color=RED, ms=3.5, lw=1.0, alpha=0.75, label=f"Гаусс–Ньютон: 30 итераций, $f={f(path_gn[-1]):.0f}$")
+    ax.plot(path_lm[:, 0], path_lm[:, 1], "-o", color=AQUA, ms=4.5, lw=2, label=f"Левенберг–Марквардт: {k_lm} итераций, $f^*$")
+    ax.annotate(f"$\\lambda={lam_used[0]:.2g}$", path_lm[1], (6, -13), textcoords="offset points", color=AQUA, fontsize=10)
+    seq = ", ".join(f"{v:.2g}" for v in lam_used[:6]) + f", …, {lam_used[-1]:.2g}"
+    ax.text(-0.72, 2.33, "$\\lambda$ принятых шагов:\n" + seq, fontsize=10, color=AQUA, ha="left", va="bottom", clip_on=True)
+    ax.plot(*x0, "o", color=INK, ms=7, zorder=9)
+    ax.set_title("Подбор $\\lambda_k$ против чистого шага")
+    ax.legend(loc="upper right", fontsize=10)
+    save("13_lm_steps.png")
+    return k_lm, rej, lam_used.max(), f(path_gn[-1])
+
+
+# ================================================================ 12 Гаусс–Ньютон на синусе
 def fig_gn_sine(S):
     t, y = S["t"], S["y"]; kgn, pgn, xgn = S["gn"]; kgd, pgd = S["gd"]; knw, pnw, xnw = S["newton"]; f = S["f"]
     fig, axes = plt.subplots(1, 2, figsize=(9, 4.3), gridspec_kw=dict(width_ratios=[1.15, 1]))
@@ -631,10 +743,10 @@ def fig_gn_sine(S):
     ax.set(xlabel="итерация $k$ (лог. шкала)", ylabel="$\\log_{10}\\Vert x_k-x^*\\Vert$", ylim=(-7, 0.6),
            title="Невязки малы — почти Ньютон")
     ax.legend(loc="lower left")
-    save("11_gn_sine.png")
+    save("12_gn_sine.png")
 
 
-# ================================================================ 12 цепь: итерации от N
+# ================================================================ 14 цепь: итерации от N
 def fig_chain_methods():
     Ns = (10, 20, 40, 80, 160)
     rows = []
@@ -644,29 +756,26 @@ def fig_chain_methods():
         L = np.linalg.eigvalsh(H)[-1]
         t0 = time.perf_counter(); _, kg, _ = gd(f, grad, v0, alpha=1 / L, maxit=400_000); tg = time.perf_counter() - t0
         _, kb, _, _ = bfgs(f, grad, v0, Q=H)
-        r = minimize(f, v0, jac=grad, method="L-BFGS-B", options={"gtol": 1e-6, "maxiter": 100_000, "maxcor": 5})
         rs = minimize(f, v0, jac=grad, method="BFGS", options={"gtol": 1e-6, "maxiter": 100_000})
         t0 = time.perf_counter(); np.linalg.solve(H, -b); tn = time.perf_counter() - t0
-        rows.append((N, kg, kb, r.nit, tg, tn, rs.nit))
-        print(f"      цепь N={N:3d}: спуск {kg} ({tg:.1f} с), BFGS точный шаг {kb}, L-BFGS m=5 {r.nit}, scipy BFGS (Вольфе) {rs.nit}, solve {tn * 1e3:.1f} мс")
+        rows.append((N, kg, kb, tg, tn, rs.nit))
+        print(f"      цепь N={N:3d}: спуск {kg} ({tg:.1f} с), BFGS точный шаг {kb}, scipy BFGS (Вольфе) {rs.nit}, solve {tn * 1e3:.1f} мс")
     rows = np.array(rows, dtype=float)
     kg40 = rows[2, 1]; kb = rows[:, 2]
     assert abs(kg40 - 10575) < 110, kg40
     assert np.array_equal(kb, [5, 10, 20, 40, 80]), kb
-    assert 60 <= rows[2, 3] <= 90, rows[2, 3]                 # L-BFGS: «75»
-    assert 55 <= rows[2, 6] <= 80, rows[2, 6]                 # scipy BFGS с условием Вольфе: «66»
+    assert 55 <= rows[2, 5] <= 80, rows[2, 5]                 # scipy BFGS с условием Вольфе: «68»
     fig, ax = plt.subplots(figsize=(9, 4.8))
     ax.plot(Ns, rows[:, 1], "o-", color=BLUE, label="градиентный спуск, шаг $1/L$  ($\\propto\\kappa\\sim N^2$)")
-    ax.plot(Ns, rows[:, 3], "^-", color=AQUA, label="L-BFGS, память 5 (SciPy)")
     ax.plot(Ns, rows[:, 2], "s-", color=VIOLET, label="BFGS, точный шаг  ($=N/2$)")
     ax.plot(Ns, np.ones(len(Ns)), "*-", color=ORANGE, ms=11, label="Ньютон: один `solve`")
-    for N, kg, kb_, kl, *_ in rows:
+    for N, kg, *_ in rows:
         ax.annotate(f"{int(kg):,}".replace(",", " "), (N, kg), (0, 7), textcoords="offset points", ha="center", color=BLUE, fontsize=10)
     ax.set_xscale("log", base=2); ax.set_yscale("log")
     ax.set(xlabel="число грузов $N$ (переменных — $2N$)", ylabel="итераций до $\\Vert\\nabla E\\Vert\\leq10^{-6}$",
            xticks=Ns, xticklabels=[str(n) for n in Ns], title="Цепь: чем больше кривизны знает $B_k$, тем меньше итераций")
     ax.legend(loc="upper left")
-    save("12_chain_methods.png")
+    save("14_chain_methods.png")
     print(f"      цепь всего: {time.perf_counter() - t_total:.1f} с")
     return rows
 
@@ -687,10 +796,13 @@ if __name__ == "__main__":
     fig_secant()
     Hs = fig_bfgs_ellipses()
     fig_rates_three(R)
+    fig_residuals(S)
     fig_gn_sine(S)
+    k_lm, rej, lam_max, f_gn_end = fig_lm_steps(S)
     rows = fig_chain_methods()
-    kg, _ = R["gd"]; kn, _ = R["newton"]; kd, _ = R["damped"]; kb, _, nfb = R["bfgs"]; sb, sf, sl = R["scipy"]
-    print(f"проверки: Розенброк — спуск {kg}, Ньютон {kn}, демпфированный {kd}, BFGS {kb} ({nfb} вызовов f), scipy BFGS {sb} ({sf}), L-BFGS-B {sl};")
+    kg, _ = R["gd"]; kn, _ = R["newton"]; kd, _ = R["damped"]; kb, _, nfb = R["bfgs"]; sb, sf = R["scipy"]
+    print(f"проверки: Розенброк — спуск {kg}, Ньютон {kn}, демпфированный {kd}, BFGS {kb} ({nfb} вызовов f), scipy BFGS {sb} ({sf});")
+    print(f"          срез синуса: Левенберг–Марквардт {k_lm} итераций, отвергнуто {rej}, max λ {lam_max:.1f}; чистый Гаусс–Ньютон f = {f_gn_end:.1f};")
     print(f"          синус — Гаусс–Ньютон {S['gn'][0]}, спуск {S['gd'][0]}, Ньютон {S['newton'][0]} (x1 = {S['newton'][2][0]:.1e});")
     print(f"          порог ln cosh {thr:.4f}; Химмельблау: минимумы {shares['min']:.1%}, сёдла {shares['saddle']:.1%}, максимум {shares['max']:.1%}")
     print(f"готово за {time.perf_counter() - t_start:.1f} с")

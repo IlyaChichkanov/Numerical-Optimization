@@ -2,9 +2,9 @@
 
 Запуск:  uv run python lectures/lecture05/scripts/make_animations.py
 
-  13_parabola_rides.gif — «парабола едет по функции»: Ньютон на f(x) = ln cosh x; один параметр —
+  15_parabola_rides.gif — «парабола едет по функции»: Ньютон на f(x) = ln cosh x; один параметр —
                           старт x_0 пробегает 0.3 -> 1.3; до порога 1.0886 метод сходится, после — расходится;
-  14_bfgs_learns.gif    — «BFGS учится эллипсу»: BFGS на Розенброке из (-1.2, 1), параметр — номер итерации;
+  16_bfgs_learns.gif    — «BFGS учится эллипсу»: BFGS на Розенброке из (-1.2, 1), параметр — номер итерации;
                           эллипс модели B_k против эллипса истинного гессиана в той же точке.
 Палитра — та же, что в make_figures.py; размер — 900 px в ширину при dpi 100, шрифт 13,
 чтобы при <img width="900"> подписи не уменьшались; размер файла проверяется (не больше 2 МБ).
@@ -195,6 +195,6 @@ if __name__ == "__main__":
     xs, ok, k = lncosh_newton(1.09); assert not ok, (xs, k)
     t0 = time.perf_counter()
     print("анимации ->", IMG)
-    for anim, name in ((anim_parabola_rides(), "13_parabola_rides.gif"), (anim_bfgs_learns(), "14_bfgs_learns.gif")):
+    for anim, name in ((anim_parabola_rides(), "15_parabola_rides.gif"), (anim_bfgs_learns(), "16_bfgs_learns.gif")):
         save_gif(anim, name)
     print(f"готово за {time.perf_counter() - t0:.1f} с")
