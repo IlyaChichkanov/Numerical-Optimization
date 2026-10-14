@@ -820,21 +820,19 @@ def fig_armijo_c1():
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 4.4))
     ax = axes[0]                                                   # прямая Армихо на phi из крючка
-    ax.axvspan(0, acc[1e-4], color=AQUA, alpha=0.08, lw=0)
     ax.axvspan(0, acc[0.25], color=AQUA, alpha=0.12, lw=0)
     ax.plot(al, phi(al), color=INK, lw=2.2, label=r"$\varphi(\alpha)=f(2+\alpha p)$")
     ax.plot(al[al <= 0.5], phi(0) + al[al <= 0.5] * d0, ":", color=GRAY, lw=1.4, label="касательная в 0")
-    ax.plot(al, phi(0) + 0.25 * al * d0, color=RED, lw=1.6, label="прямая Армихо, $c_1=0.25$")
-    ax.plot(al, phi(0) + 1e-4 * al * d0, "--", color=ORANGE, lw=1.6, label="прямая Армихо, $c_1=10^{-4}$")
+    ax.plot(al, phi(0) + 0.25 * al * d0, color=RED, lw=1.6, label="прямая Армихо ($c_1=0.25$)")
     ax.plot(1, phi(1), "x", color=RED, ms=12, mew=2.5, zorder=7)
     ax.annotate(r"$\alpha=1$: $3.28$ — отказ", (1, phi(1)), (0.57, 3.5), color=RED, fontsize=11)
     ax.plot(0.5, phi(0.5), "s", color=BLUE, ms=8, zorder=7)
     ax.annotate(r"$\alpha=\frac{1}{2}$: $0.27$ — принят", (0.5, phi(0.5)), (0.33, -0.9), color=BLUE, fontsize=11,
                 arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
-    ax.text(0.02, -1.9, f"Армихо: $\\alpha\\leq{acc[0.25]:.2f}$ при $c_1=0.25$, $\\alpha\\leq{acc[1e-4]:.2f}$ при $10^{{-4}}$",
-            fontsize=10.5, color="#0c7a54")
+    ax.text(acc[0.25] / 2, -1.85, "шаг принят", ha="center", fontsize=11, color="#0c7a54")
+    ax.text((acc[0.25] + 1.05) / 2, -1.85, "отвергнут", ha="center", fontsize=11, color=RED)
     ax.set(xlim=(0, 1.05), ylim=(-2.0, 3.9), xlabel=r"длина шага $\alpha$", ylabel=r"$\varphi(\alpha)$",
-           title="правило Армихо на $\\varphi$ из крючка")
+           title="Армихо: $\\varphi$ под прямой — шаг принят")
     ax.legend(loc="upper left", fontsize=10)
 
     ax = axes[1]                                                   # уменьшение есть, сходимости нет
@@ -852,10 +850,10 @@ def fig_armijo_c1():
         ax.plot([v, v], [0, 1], ":", color=GRAY, lw=1)
     ax.plot(0, 0, "*", color=AQUA, ms=14, zorder=7)
     ax.text(0, 0.6, "$f(x_k)\\to1$\n$f'(x_k)\\to\\pm2$", ha="center", va="center", fontsize=11, color=INK)
-    ax.text(0.03, 0.97, f"$f_k-f_{{k+1}}\\approx2^{{-k}}\\to0$,\nАрмихо требует $\\geq c_1\\alpha_k|\\varphi'(0)|\\approx4c_1$:\n"
+    ax.text(0.03, 0.97, f"$f$ убывает на $\\approx2^{{-k}}$,\nАрмихо просит $\\approx4c_1$:\n"
             f"при $c_1=10^{{-4}}$ нарушено с $k={k_fail}$", transform=ax.transAxes, va="top", fontsize=10.5,
             bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-    ax.set(xlim=(-2.3, 2.3), ylim=(-0.4, 4.6), xlabel="$x$", title="$x^2$: $f$ убывает, но $f'\\to\\pm2$")
+    ax.set(xlim=(-2.3, 2.3), ylim=(-0.4, 4.6), xlabel="$x$", title="зачем $c_1$: $f$ убывает, но $f'\\to\\pm2$")
     save("02_armijo_c1.png")
     return k_fail
 
