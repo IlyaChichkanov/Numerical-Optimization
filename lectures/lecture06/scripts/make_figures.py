@@ -11,6 +11,7 @@
   00_hooks            три крючка: Ньютон на арктангенсе, бассейны Химмельблау, цепь N=400
   00_atan_newton      почему чистый Ньютон улетает на арктангенсе: парабола-модель и касательная к f'
   01_review           повторение: пути четырёх методов на Розенброке и биография цепи
+  02_armijo_c1        зачем c1: прямая Армихо на phi(alpha) из крючка; контрпример x^2 — f убывает, f' не -> 0
   02_armijo_wolfe     phi(alpha) на Розенброке в x_1: допустимые по Армихо и Вольфе шаги
   03_bfgs_wolfe       s^T y у BFGS с Армихо и с Вольфе; цепь: норма градиента и пол округления
   04_saddle_trap      Ньютон с Армихо приходит в седло, доверительная область — в минимум
@@ -798,6 +799,67 @@ def fig_armijo_wolfe():
     return arm, wol, swol
 
 
+# ================================================================ 02 Армихо: зачем c1
+def fig_armijo_c1():
+    x0 = 2.0; p = -(1 + x0 ** 2) * np.arctan(x0)                  # шаг Ньютона из крючка (арктангенс)
+    phi = lambda a: f_arctan(x0 + a * p); d0 = np.arctan(x0) * p  # phi'(0) = f'(x0) p
+    al = np.linspace(0, 1.05, 105_001)
+    acc = {}
+    for c1 in (1e-4, 0.25):
+        ok = phi(al) <= phi(0) + c1 * al * d0
+        acc[c1] = al[np.argmax(~ok[1:]) + 1]                       # первое alpha, где Армихо нарушено
+    assert abs(phi(0) - 1.4096) < 1e-3 and abs(phi(1) - 3.278) < 1e-3 and abs(phi(0.5) - 0.2711) < 1e-3
+    assert abs(acc[1e-4] - 0.7225) < 2e-3 and abs(acc[0.25] - 0.565) < 2e-3 and abs(d0 + 6.129) < 1e-3, (acc, d0)
+    # контрпример §2.2: x_k = (-1)^k (1 + 2^-k) на f = x^2, направление -f'(x_k), Армихо с c1 = 1e-4
+    ks = np.arange(0, 16)
+    xk = (-1.0) ** ks * (1 + 2.0 ** -ks); xk1 = (-1.0) ** (ks + 1) * (1 + 2.0 ** -(ks + 1))
+    pk = -2 * xk; ak = (xk1 - xk) / pk
+    dec = xk ** 2 - xk1 ** 2; req = 1e-4 * ak * np.abs(2 * xk * pk)
+    k_fail = int(ks[np.argmax(dec < req)])
+    assert k_fail == 12 and np.all(dec > 0) and abs(ak[-1] - 1) < 1e-4, (k_fail, ak[-1])
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4))
+    ax = axes[0]                                                   # прямая Армихо на phi из крючка
+    ax.axvspan(0, acc[1e-4], color=AQUA, alpha=0.08, lw=0)
+    ax.axvspan(0, acc[0.25], color=AQUA, alpha=0.12, lw=0)
+    ax.plot(al, phi(al), color=INK, lw=2.2, label=r"$\varphi(\alpha)=f(2+\alpha p)$")
+    ax.plot(al[al <= 0.5], phi(0) + al[al <= 0.5] * d0, ":", color=GRAY, lw=1.4, label="касательная в 0")
+    ax.plot(al, phi(0) + 0.25 * al * d0, color=RED, lw=1.6, label="прямая Армихо, $c_1=0.25$")
+    ax.plot(al, phi(0) + 1e-4 * al * d0, "--", color=ORANGE, lw=1.6, label="прямая Армихо, $c_1=10^{-4}$")
+    ax.plot(1, phi(1), "x", color=RED, ms=12, mew=2.5, zorder=7)
+    ax.annotate(r"$\alpha=1$: $3.28$ — отказ", (1, phi(1)), (0.57, 3.5), color=RED, fontsize=11)
+    ax.plot(0.5, phi(0.5), "s", color=BLUE, ms=8, zorder=7)
+    ax.annotate(r"$\alpha=\frac{1}{2}$: $0.27$ — принят", (0.5, phi(0.5)), (0.33, -0.9), color=BLUE, fontsize=11,
+                arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
+    ax.text(0.02, -1.9, f"Армихо: $\\alpha\\leq{acc[0.25]:.2f}$ при $c_1=0.25$, $\\alpha\\leq{acc[1e-4]:.2f}$ при $10^{{-4}}$",
+            fontsize=10.5, color="#0c7a54")
+    ax.set(xlim=(0, 1.05), ylim=(-2.0, 3.9), xlabel=r"длина шага $\alpha$", ylabel=r"$\varphi(\alpha)$",
+           title="правило Армихо на $\\varphi$ из крючка")
+    ax.legend(loc="upper left", fontsize=10)
+
+    ax = axes[1]                                                   # уменьшение есть, сходимости нет
+    t = np.linspace(-2.3, 2.3, 400)
+    ax.plot(t, t ** 2, color=INK, lw=2.2)
+    n_show = 7
+    xs, ys = xk[:n_show], xk[:n_show] ** 2
+    for i in range(n_show - 1):
+        arrow(ax, (xs[i], ys[i]), (xs[i + 1], ys[i + 1]), RED, lw=1.2, ms=11, alpha=0.9 - 0.1 * i,
+              connectionstyle="arc3,rad=0.25")
+    ax.plot(xs, ys, "o", color=RED, ms=7, zorder=7)
+    for i, (dx, dy, ha) in enumerate(((-0.12, 0.25, "right"), (-0.12, 0.3, "right"), (0.12, 0.3, "left"))):
+        ax.annotate(f"$x_{i}={xs[i]:g}$", (xs[i], ys[i]), (xs[i] + dx, ys[i] + dy), color=RED, fontsize=11, ha=ha)
+    for v in (-1, 1):
+        ax.plot([v, v], [0, 1], ":", color=GRAY, lw=1)
+    ax.plot(0, 0, "*", color=AQUA, ms=14, zorder=7)
+    ax.text(0, 0.6, "$f(x_k)\\to1$\n$f'(x_k)\\to\\pm2$", ha="center", va="center", fontsize=11, color=INK)
+    ax.text(0.03, 0.97, f"$f_k-f_{{k+1}}\\approx2^{{-k}}\\to0$,\nАрмихо требует $\\geq c_1\\alpha_k|\\varphi'(0)|\\approx4c_1$:\n"
+            f"при $c_1=10^{{-4}}$ нарушено с $k={k_fail}$", transform=ax.transAxes, va="top", fontsize=10.5,
+            bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
+    ax.set(xlim=(-2.3, 2.3), ylim=(-0.4, 4.6), xlabel="$x$", title="$x^2$: $f$ убывает, но $f'\\to\\pm2$")
+    save("02_armijo_c1.png")
+    return k_fail
+
+
 # ================================================================ 03 Вольфе и BFGS
 def fig_bfgs_wolfe():
     rng = np.random.default_rng(2026)
@@ -1147,6 +1209,7 @@ if __name__ == "__main__":
     fig_atan_newton(R)
     fig_review(R)
     arm, wol, swol = fig_armijo_wolfe()
+    k_fail = fig_armijo_c1()
     stat, floor = fig_bfgs_wolfe()
     kl, kt, xl = fig_saddle_trap()
     pnorm, lam2 = fig_tr_subproblem()
@@ -1158,7 +1221,8 @@ if __name__ == "__main__":
     kt_, _, _, rej, kdl, kc = R["tr_rosen"]
     print(f"проверки: арктангенс {R['atan_pure'][-1]:.3g}, с Армихо {len(R['atan_damped']) - 1} итераций; "
           f"модель обещала {R['atan_promise'][1]:.3f}, получили {R['atan_promise'][2]:.3f}; порог {R['atan_thr']:.4f};")
-    print(f"          Армихо α ≤ {arm[1]:.3f}, Вольфе {wol[0]:.3f}–{wol[1]:.3f}, сильный до {swol[1]:.3f};")
+    print(f"          Армихо α ≤ {arm[1]:.3f}, Вольфе {wol[0]:.3f}–{wol[1]:.3f}, сильный до {swol[1]:.3f}; "
+          f"контрпример x^2 нарушает Армихо с k = {k_fail};")
     print(f"          Химмельблау s^T y <= 0: Армихо {stat['armijo']}, Вольфе {stat['wolfe']}; пол округления {floor:.2e};")
     print(f"          ловушка: Армихо → седло {xl.round(3)} за {kl}, область → (3,2) за {kt};")
     print(f"          доверительная область на Розенброке: точный {kt_} (отвергнуто {rej}), dogleg {kdl}, Коши {kc};")
