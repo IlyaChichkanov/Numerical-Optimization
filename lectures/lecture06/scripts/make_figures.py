@@ -9,6 +9,7 @@
 
 Картинки в порядке появления в конспекте:
   00_hooks            три крючка: Ньютон на арктангенсе, бассейны Химмельблау, цепь N=400
+  00_atan_newton      почему чистый Ньютон улетает на арктангенсе: парабола-модель и касательная к f'
   01_review           повторение: пути четырёх методов на Розенброке и биография цепи
   02_armijo_wolfe     phi(alpha) на Розенброке в x_1: допустимые по Армихо и Вольфе шаги
   03_bfgs_wolfe       s^T y у BFGS с Армихо и с Вольфе; цепь: норма градиента и пол округления
@@ -32,7 +33,7 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Circle, FancyArrowPatch
 from PIL import Image
-from scipy.optimize import minimize, rosen as rosen_nd, rosen_der, rosen_hess_prod
+from scipy.optimize import brentq, minimize, rosen as rosen_nd, rosen_der, rosen_hess_prod
 
 IMG = Path(__file__).resolve().parent.parent / "img"
 IMG.mkdir(exist_ok=True)
@@ -563,6 +564,17 @@ def runs():
         x = x + a * p; seq_d.append(x[0]); alphas.append(a)
     R["atan_damped"] = np.array(seq_d)
     assert len(alphas) == 5 and alphas == [0.5, 1.0, 1.0, 1.0, 1.0], alphas
+    assert np.allclose(seq_d[1:4], [-0.7679, 0.2731, -0.01338], rtol=1e-3) and abs(seq_d[4] - 1.6e-6) < 1e-7, seq_d
+    # обещание параболы-модели в x0 = 2 против правды; порог старта (шаг переносит ровно в -x)
+    x0, x1 = seq[0], seq[1]
+    m1 = f_arctan(x0) + np.arctan(x0) * (x1 - x0) + 0.5 / (1 + x0 ** 2) * (x1 - x0) ** 2
+    thr = brentq(lambda x: (1 + x * x) * np.arctan(x) - 2 * x, 1.0, 2.0)
+    R["atan_promise"] = (f_arctan(x0), m1, f_arctan(x1), f_arctan(seq_d[1]))
+    R["atan_thr"] = thr
+    assert np.allclose(R["atan_promise"], [1.4096, -1.655, 3.278, 0.2711], rtol=1e-3), R["atan_promise"]
+    assert abs(thr - 1.3917) < 1e-4, thr
+    ratio = np.abs(seq[3:6]) / np.array(seq[2:5]) ** 2           # |x_{k+1}| / x_k^2 -> pi/2
+    assert np.allclose(ratio, [1.435, 1.564, 1.5708], rtol=1e-3), ratio
 
     # Розенброк: повторение Л5
     xg, kg, pg = gd(rosen, rosen_grad, X0_ROSEN)
@@ -638,6 +650,61 @@ def fig_hooks(R, B):
     ax.legend(loc="lower left", fontsize=10)
     save("00_hooks.png")
     return k_gd, k_cg
+
+
+# ================================================================ 00 почему Ньютон улетает на арктангенсе
+def fig_atan_newton(R):
+    seq = R["atan_pure"]; x0, x1, x2 = seq[0], seq[1], seq[2]
+    f0, m1, f1, f_half = R["atan_promise"]; thr = R["atan_thr"]
+    x_half = R["atan_damped"][1]
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4), gridspec_kw=dict(width_ratios=[1, 1.1]))
+
+    ax = axes[0]                                       # f и парабола-модель в x0
+    t = np.linspace(-5, 4, 600)
+    ax.plot(t, f_arctan(t), color=INK, lw=2.2, label="$f(x)$")
+    par = f0 + np.arctan(x0) * (t - x0) + 0.5 / (1 + x0 ** 2) * (t - x0) ** 2
+    ax.plot(t, par, color=RED, lw=1.6, label="парабола-модель в $x_0$")
+    ax.plot(x0, f0, "o", color=RED, ms=7, zorder=7)
+    ax.annotate("$x_0=2$", (x0, f0), (x0 + 0.25, f0 - 0.9), color=RED, fontsize=11)
+    ax.plot([x1, x1], [m1, f1], ":", color=RED, lw=1.2)
+    ax.plot(x1, m1, "v", color=RED, ms=8, zorder=7)
+    ax.plot(x1, f1, "o", color=RED, ms=7, zorder=7)
+    ax.annotate(f"модель обещала ${m1:.2f}$", (x1, m1), (x1 + 0.3, -2.3), color=RED, fontsize=10.5)
+    ax.annotate(f"получили ${f1:.2f}$\n$x_1={x1:.2f}$", (x1, f1), (x1 + 0.3, f1 + 0.5), color=RED, fontsize=10.5)
+    ax.plot(x_half, f_half, "s", color=BLUE, ms=7, zorder=8)
+    ax.annotate(f"$\\alpha=\\frac{{1}}{{2}}$: ${f_half:.2f}$", (x_half, f_half), (x_half - 0.1, f_half + 1.1),
+                color=BLUE, fontsize=10.5, ha="center", arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
+    ax.plot(0, 0, "*", color=AQUA, ms=14, zorder=7)
+    ax.set(xlim=(-5, 4), ylim=(-2.5, 5.5), xlabel="$x$", title="парабола-модель в $x_0=2$")
+    ax.legend(loc="upper right", fontsize=10)
+
+    ax = axes[1]                                       # f' = arctan x и касательные
+    t = np.linspace(-5, 15, 800)
+    ax.plot(t, np.arctan(t), color=INK, lw=2.2, label=r"$f'=\arctan x$")
+    for y in (np.pi / 2, -np.pi / 2):
+        ax.axhline(y, color=GRAY, ls=":", lw=1)
+    ax.text(11.5, np.pi / 2 + 0.05, r"$+\pi/2$", color=GRAY, ha="right", va="bottom", fontsize=11)
+    ax.text(14.8, -np.pi / 2 - 0.05, r"$-\pi/2$", color=GRAY, ha="right", va="top", fontsize=11)
+    ax.axhline(0, color=GRAY, lw=0.8)
+    for i, (xa, xb, ls, al) in enumerate(((x0, x1, "-", 1.0), (x1, x2, "--", 0.7))):
+        g, h = np.arctan(xa), 1 / (1 + xa ** 2)
+        tt = np.array([xb, xa]) if xa > xb else np.array([xa, xb])
+        tt = np.linspace(tt[0] - 0.5, tt[1] + 0.5, 50)
+        ax.plot(tt, g + h * (tt - xa), ls, color=RED, lw=1.6, alpha=al, label="касательная в $x_k$" if i == 0 else None)
+        ax.plot(xa, g, "o", color=RED, ms=7, zorder=7, alpha=al)
+        ax.plot([xb, xb], [0, np.arctan(xb)], ":", color=RED, lw=1, alpha=al)
+        ax.plot(xb, 0, "o", color=RED, ms=6, zorder=7, alpha=al, mfc="white")
+    ax.annotate("$x_0=2$", (x0, np.arctan(x0)), (x0 + 0.6, np.arctan(x0) - 0.35), color=RED, fontsize=11)
+    ax.annotate(f"$x_1={x1:.2f}$", (x1, 0), (x1 - 1.2, -0.38), color=RED, fontsize=11, ha="left")
+    ax.annotate(f"$x_2={x2:.2f}$", (x2, 0), (x2 - 0.3, -0.62), color=RED, fontsize=11, ha="right")
+    ax.plot(0, 0, "*", color=AQUA, ms=14, zorder=7)
+    for sgn in (1, -1):
+        ax.plot([sgn * thr, sgn * thr], [-0.12, 0.12], color=GRAY, lw=2)
+    ax.annotate(f"порог $\\pm{thr:.2f}$", (thr, -0.12), (thr + 1.3, -0.4), color=GRAY, fontsize=10.5,
+                arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
+    ax.set(xlim=(-5, 15), ylim=(-1.85, 1.85), xlabel="$x$", title="$f'=\\arctan x$: касательная перелетает")
+    ax.legend(loc="upper left", fontsize=10)
+    save("00_atan_newton.png")
 
 
 # ================================================================ 01 повторение
@@ -1077,6 +1144,7 @@ if __name__ == "__main__":
     R = runs()
     B = basins_all()
     k_gd400, k_cg400 = fig_hooks(R, B)
+    fig_atan_newton(R)
     fig_review(R)
     arm, wol, swol = fig_armijo_wolfe()
     stat, floor = fig_bfgs_wolfe()
@@ -1088,7 +1156,8 @@ if __name__ == "__main__":
     gd_counts, cg_counts = fig_cg_chain()
     ncg = fig_newton_cg()
     kt_, _, _, rej, kdl, kc = R["tr_rosen"]
-    print(f"проверки: арктангенс {R['atan_pure'][-1]:.3g}, с Армихо {len(R['atan_damped']) - 1} итераций;")
+    print(f"проверки: арктангенс {R['atan_pure'][-1]:.3g}, с Армихо {len(R['atan_damped']) - 1} итераций; "
+          f"модель обещала {R['atan_promise'][1]:.3f}, получили {R['atan_promise'][2]:.3f}; порог {R['atan_thr']:.4f};")
     print(f"          Армихо α ≤ {arm[1]:.3f}, Вольфе {wol[0]:.3f}–{wol[1]:.3f}, сильный до {swol[1]:.3f};")
     print(f"          Химмельблау s^T y <= 0: Армихо {stat['armijo']}, Вольфе {stat['wolfe']}; пол округления {floor:.2e};")
     print(f"          ловушка: Армихо → седло {xl.round(3)} за {kl}, область → (3,2) за {kt};")
