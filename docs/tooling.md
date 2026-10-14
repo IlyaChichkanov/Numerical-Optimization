@@ -23,7 +23,7 @@ homeworks/hwNN.md, .ipynb   домашние задания: md — кратко
 homeworks/solutions/        решения, публикуются после дедлайна задания; build_hwNN.py собирает из
                             одного описания и шаблон hwNN.ipynb, и hwNN_solution.ipynb (ячейки с полем
                             solution). До дедлайна ни решение, ни его сборщик в репозиторий не кладутся
-submissions/hwNN/           сданные работы <фамилия>.ipynb — приходят pull request'ами, см. CONTRIBUTING.md
+submissions/hwNN/           сданные pull request'ом работы ДЗ 1–2; с ДЗ 3 — личные закрытые репозитории, см. CONTRIBUTING.md
 tools/                      вспомогательные скрипты
 ```
 
