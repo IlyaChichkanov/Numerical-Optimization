@@ -19,7 +19,7 @@
   04_saddle_trap      Ньютон с Армихо приходит в седло, доверительная область — в минимум (в конспекте — §3.5)
   05_tr_subproblem    подзадача доверительной области: точка Коши, dogleg, точный шаг
   06_tr_rosenbrock    доверительная область на Розенброке: путь, Delta_k и rho_k
-  07_basins_three     Химмельблау: чистый Ньютон / Ньютон с Армихо / доверительная область
+  07_basins_three     Химмельблау: чистый Ньютон / Ньютон с Армихо / доверительная область (в конспекте — §3.5)
   08_cg_ellipse       эллипс kappa=50: спуск 567 против CG 2; цепь N=40: четыре метода
   09_cg_chain         цепь: итерации от N (спуск ~N^2, CG = N/2) и сходимость CG
   10_newton_cg        Розенброк в 1000 переменных: Newton-CG против L-BFGS-B
@@ -591,6 +591,13 @@ def runs():
     xt, kt, pt, ht = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step="exact")
     rej = sum(not h[4] for h in ht)
     assert kt == 25 and rej == 3 and np.allclose(xt, 1, atol=1e-6), (kt, rej)
+    # пример с числами в §3.2: итерация 1 — обещано 1.54, факт -0.66 (рост с 4.73 до 5.39), rho = -0.43, отвергнут;
+    # повтор с Delta = 0.25 — обещано 0.42, получено 0.43, rho = 1.01
+    for idx, D_exp, pred_exp, act_exp, rho_exp, acc_exp in [(1, 1.0, 1.536, -0.660, -0.430, False), (2, 0.25, 0.421, 0.427, 1.014, True)]:
+        xk, pk, Dk, rhok, acck = ht[idx]
+        pred = -(rosen_grad(xk) @ pk + 0.5 * pk @ rosen_hess(xk) @ pk); act = rosen(xk) - rosen(xk + pk)
+        assert Dk == D_exp and abs(pred - pred_exp) < 2e-3 and abs(act - act_exp) < 2e-3 and abs(rhok - rho_exp) < 2e-3 and acck == acc_exp, (idx, Dk, pred, act, rhok)
+    assert abs(rosen(ht[1][0]) - 4.732) < 1e-3 and abs(rosen(ht[1][0] + ht[1][1]) - 5.392) < 1e-3
     xdl, kdl, _, hdl = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step="dogleg")
     assert kdl == 24 and sum(not h[4] for h in hdl) == 3, kdl
     xc, kc, _, _ = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step="cauchy")
