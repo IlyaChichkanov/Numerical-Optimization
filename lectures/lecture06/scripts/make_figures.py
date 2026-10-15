@@ -20,7 +20,8 @@
                       (с 15.10 в конспекте не показывается — для демо (e), упражнения 6.2 и семинара)
   05_tr_model         функция введения + x2^2/2 из (2, 1): парабола-модель против функции; Ньютон улетает,
                       доверительная область — 6 итераций
-  05_tr_subproblem    подзадача доверительной области: точка Коши, dogleg, точный шаг
+  05_tr_subproblem    одна подзадача (g=(3,4), B=diag(1,5), Delta=2) — три ответа: Коши, dogleg, точный;
+                      справа уравнение ||p(lambda)|| = Delta
   06_tr_rosenbrock    доверительная область на Розенброке: путь, Delta_k и rho_k
   07_basins_three     Химмельблау: чистый Ньютон / Ньютон с Армихо / доверительная область
                       (с 15.10 в конспекте не показывается; числа 36 % / 100 % — во введении)
@@ -996,55 +997,70 @@ def model_grid(ax, x, g, B, lim, levels, n=300):
 
 
 def fig_tr_subproblem():
-    g, B = np.array([3.0, 4.0]), np.diag([1.0, 2.0])
-    pN = -np.linalg.solve(B, g); pU = -(g @ g) / (g @ B @ g) * g
+    """Одна подзадача — модель-чаша g = (3, 4), B = diag(1, 5), круг Delta = 2 — и три ответа: точка Коши
+    (минимум модели вдоль -g; здесь он внутри круга), dogleg (ломаная через точку Коши к точке Ньютона, шаг там,
+    где она выходит из круга), точный шаг (кривая p(lambda) от точки Ньютона к направлению -g, шаг на
+    пересечении с кругом; lambda* ~ 0.6). Справа — одно уравнение ||p(lambda)|| = Delta по lambda."""
+    g, B, D = np.array([3.0, 4.0]), np.diag([1.0, 5.0]), 2.0
     m = lambda p: g @ p + 0.5 * p @ B @ p
-    pc1 = cauchy_point(g, B, 1.0)
-    assert np.allclose(pc1, [-0.6, -0.8]) and abs(m(pc1) + 4.18) < 1e-9
-    assert np.allclose(pN, [-3, -2]) and abs(m(pN) + 8.5) < 1e-12 and abs(np.linalg.norm(pU) - 3.049) < 1e-3
-    fig, axs = plt.subplots(1, 2, figsize=(8.8, 4.6))
-    ax = axs[0]
-    o = np.zeros(2)
-    model_grid(ax, o, g, B, 5.0, levels=np.sort(m(pN) + np.array([0.15, 0.7, 1.6, 3, 5, 8, 12])))
-    Ds = np.linspace(0.02, np.linalg.norm(pN), 150)
-    path = np.array([tr_exact(g, B, D) for D in Ds])
-    ax.plot(path[:, 0], path[:, 1], color=BLUE, lw=2.6, label="точный шаг при разных $\\Delta$")
-    ax.plot([0, pU[0], pN[0]], [0, pU[1], pN[1]], "--", color=ORANGE, lw=2, label="dogleg")
-    for D in (1.0, 2.0, 3.0):
-        ax.add_patch(Circle(o, D, fill=False, lw=1, color=INK, alpha=0.55))
-        pc = cauchy_point(g, B, D)
-        ax.plot(*pc, "D", color=YELLOW, mec=INK, ms=7, zorder=7)
-        ax.text(D * 0.72 + 0.05, D * 0.72, f"$\\Delta={D:g}$", fontsize=10)
-    ax.plot([], [], "D", color=YELLOW, mec=INK, ms=7, label="точки Коши")
-    ax.plot(*pN, "o", color=RED, ms=9, mec=INK, zorder=8, label="точка Ньютона")
-    ax.plot(0, 0, "o", color=INK, ms=7, zorder=8)
-    arrow(ax, (0, 0), -0.9 * g / np.linalg.norm(g), GRAY, lw=1.5, ms=12)
-    ax.text(-0.95, -0.2, "$-g$", fontsize=11, color=GRAY)
-    ax.set(xlim=(-4.2, 3.4), ylim=(-4.2, 3.4), aspect="equal", xlabel="$p_1$", ylabel="$p_2$",
-           title="модель-чаша: $g=(3,4)$, $B=\\mathrm{diag}(1,2)$")
-    ax.legend(loc="lower right", fontsize=9)
+    pB = -np.linalg.solve(B, g); pU = -(g @ g) / (g @ B @ g) * g
+    assert np.allclose(pB, [-3, -0.8]) and abs(np.linalg.norm(pB) - 3.105) < 1e-3 and abs(m(pB) + 6.1) < 1e-9
+    assert np.allclose(pU, [-0.843, -1.124], atol=1e-3) and abs(np.linalg.norm(pU) - 1.405) < 1e-3 and abs(m(pU) + 3.511) < 1e-3
+    pc, pd, pe = cauchy_point(g, B, D), dogleg(g, B, D), tr_exact(g, B, D)
+    assert np.allclose(pc, pU) and abs(np.linalg.norm(pd) - D) < 1e-8 and abs(np.linalg.norm(pe) - D) < 1e-6
+    assert m(pc) > m(pd) > m(pe), (m(pc), m(pd), m(pe))
+    p_lam = lambda lam: -np.linalg.solve(B + lam * np.eye(2), g)
+    lam_star = brentq(lambda lam: np.linalg.norm(p_lam(lam)) - D, 0.0, 50.0)
+    assert np.allclose(p_lam(lam_star), pe, atol=1e-5) and abs(lam_star - 0.6) < 0.05, lam_star
+    print(f"   подзадача: Коши m={m(pc):.3f}, dogleg m={m(pd):.3f}, точный m={m(pe):.3f}, lambda*={lam_star:.3f}")
 
-    ax = axs[1]
-    xs_ = np.array([0.4, 2.0])                          # у седла Химмельблау (0.09, 2.88): гессиан индефинитен
-    g2, B2 = him_grad(xs_), him_hess(xs_)
-    lam2 = np.linalg.eigvalsh(B2)
-    assert lam2[0] < 0 < lam2[1], lam2
-    model_grid(ax, xs_, g2, B2, 2.2, levels=np.linspace(-60, 60, 17))
-    pN = -np.linalg.solve(B2, g2)
-    for D, col in [(0.5, VIOLET), (1.0, BLUE), (1.6, AQUA)]:
-        ax.add_patch(Circle(xs_, D, fill=False, lw=1, color=INK, alpha=0.6))
-        p = tr_exact(g2, B2, D)
-        assert abs(np.linalg.norm(p) - D) < 1e-8
-        arrow(ax, xs_, xs_ + p, col, lw=2)
-        ax.text(*(xs_ + p * 1.08), f"$\\Delta={D:g}$", fontsize=10, color=col)
-    ax.plot(*(xs_ + pN), "o", color=RED, ms=9, mec=INK, zorder=8)
-    ax.annotate("точка Ньютона =\nседло модели", xs_ + pN, xytext=(xs_[0] - 2.0, xs_[1] + 1.5), fontsize=10,
-                arrowprops=dict(arrowstyle="->", color=RED))
-    ax.plot(*xs_, "o", color=INK, ms=7, zorder=8)
-    ax.set(xlim=(xs_[0] - 2.2, xs_[0] + 2.2), ylim=(xs_[1] - 2.2, xs_[1] + 2.2), aspect="equal", xlabel="$x_1$",
-           ylabel="$x_2$", title=f"Химмельблау в $(0.4,2)$: седло, $\\lambda_{{\\min}}={lam2[0]:.0f}$")
+    fig, axs = plt.subplots(1, 2, figsize=(9, 4.6), gridspec_kw=dict(width_ratios=[1.15, 1]))
+    ax = axs[0]                                                    # одна подзадача — три ответа
+    o = np.zeros(2)
+    model_grid(ax, o, g, B, 4.5, levels=np.sort(m(pB) + np.array([0.3, 1, 2, 3.5, 5.5, 8, 11, 15, 20])))
+    ax.add_patch(Circle(o, D, fill=False, lw=1.6, color=INK))
+    ax.text(D * 0.74 + 0.08, -D * 0.74 - 0.22, f"$\\Delta={D:g}$", fontsize=10)
+    u = -g / np.linalg.norm(g)
+    ax.plot([0, D * u[0]], [0, D * u[1]], "-", color=GRAY, lw=1.2)                       # луч -g до круга
+    ax.text(D * u[0] + 0.05, D * u[1] - 0.5, "луч $-g$", fontsize=10, color=GRAY)
+    ax.plot([0, pU[0], pB[0]], [0, pU[1], pB[1]], "--", color=ORANGE, lw=2)              # ломаная dogleg
+    lams = np.concatenate([[0.0], np.geomspace(0.02, 300, 200)])
+    curve = np.array([p_lam(l) for l in lams])
+    ax.plot(curve[:, 0], curve[:, 1], "-", color=BLUE, lw=2.2)                           # кривая p(lambda)
+    for lam, dx, dy in [(2, 0.1, 0.22), (10, 0.14, 0.12)]:
+        q = p_lam(lam); ax.text(q[0] + dx, q[1] + dy, f"$\\lambda={lam}$", fontsize=10, color=BLUE)
+    ax.plot(*pB, "o", color=RED, ms=9, mec=INK, zorder=8)
+    ax.annotate("точка Ньютона ($\\lambda=0$)\n$m=-6.1$", pB, (pB[0] + 0.05, pB[1] - 1.0), color=RED, fontsize=10)
+    ax.plot(*pc, "D", color=YELLOW, mec=INK, ms=8, zorder=9)
+    ax.plot(*pd, "s", color=ORANGE, mec=INK, ms=8, zorder=9)
+    ax.plot(*pe, "o", color=BLUE, mec=INK, ms=8, zorder=9)
+    ax.plot(0, 0, "o", color=INK, ms=7, zorder=8)
+    ax.text(0.1, 0.12, "$x_k$", fontsize=11)
+    ax.plot([], [], "D", color=YELLOW, mec=INK, ms=8, ls="none", label=f"точка Коши: $m={m(pc):.2f}$")
+    ax.plot([], [], "s--", color=ORANGE, mec=INK, ms=8, label=f"dogleg: $m={m(pd):.2f}$")
+    ax.plot([], [], "o-", color=BLUE, mec=INK, ms=8, label=f"точный шаг: $m={m(pe):.2f}$")
+    ax.legend(loc="upper left", fontsize=10)
+    ax.set(xlim=(-3.7, 2.3), ylim=(-2.7, 2.5), aspect="equal", xlabel="$p_1$", ylabel="$p_2$",
+           title="одна подзадача — три ответа")
+
+    ax = axs[1]                                                    # точный шаг: уравнение по lambda
+    lam_grid = np.linspace(0, 8, 400)
+    norms = np.array([np.linalg.norm(p_lam(l)) for l in lam_grid])
+    ax.plot(lam_grid, norms, color=BLUE, lw=2.2)
+    ax.axhline(D, color=INK, lw=1.2, ls="--")
+    ax.text(6.6, D + 0.08, f"$\\Delta={D:g}$", fontsize=10)
+    ax.axhline(3.5, color=GRAY, lw=1.2, ls="--")
+    ax.text(1.4, 3.58, "$\\Delta=3.5$: точка Ньютона внутри круга, $\\lambda=0$", fontsize=10, color=GRAY)
+    ax.vlines(lam_star, 0, D, colors=BLUE, linestyles=":", lw=1.4)
+    ax.plot(lam_star, D, "o", color=BLUE, mec=INK, ms=8, zorder=8)
+    ax.annotate(f"$|p(\\lambda)|=\\Delta$ при $\\lambda={lam_star:.2f}$", (lam_star, D), (2.2, 2.55), fontsize=10, color=BLUE,
+                arrowprops=dict(arrowstyle="->", color=BLUE))
+    ax.plot(0, np.linalg.norm(pB), "o", color=RED, mec=INK, ms=8, zorder=8)
+    ax.text(0.2, np.linalg.norm(pB) - 0.3, "$\\lambda=0$: точка Ньютона, $|p|=3.10$", fontsize=10, color=RED)
+    ax.set(xlim=(-0.2, 8), ylim=(0, 4.0), xlabel="$\\lambda$", ylabel="длина шага $|(B+\\lambda I)^{-1}g|$",
+           title="точный шаг: уравнение по $\\lambda$")
     save("05_tr_subproblem.png")
-    return np.linalg.norm(pN), lam2
+    return np.linalg.norm(pB), lam_star
 
 
 # ================================================================ 05 парабола-модель против функции
