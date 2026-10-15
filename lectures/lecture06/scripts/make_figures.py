@@ -11,7 +11,8 @@
   00_hooks            три крючка: Ньютон на арктангенсе, бассейны Химмельблау, цепь N=400
   00_atan_newton      почему чистый Ньютон улетает на арктангенсе: парабола-модель и касательная к f'
   01_review           повторение: пути четырёх методов на Розенброке и биография цепи
-  02_armijo_c1        зачем c1: прямая Армихо на phi(alpha) из крючка; контрпример x^2 — f убывает, f' не -> 0
+  02_alpha_cut        выброс Ньютона на Розенброке: шаг из x_1 на линиях уровня и разрез phi(alpha) вдоль него
+  02_armijo_c1        правило Армихо: phi(alpha) из введения, касательная и прямая Армихо (одна панель)
   02_armijo_wolfe     phi(alpha) на Розенброке в x_1: допустимые по Армихо и Вольфе шаги
   03_bfgs_wolfe       s^T y у BFGS с Армихо и с Вольфе; цепь: норма градиента и пол округления
                       (с 15.10 в конспекте не показывается — только для упражнения 6.10 и демо)
@@ -800,6 +801,44 @@ def fig_armijo_wolfe():
     return arm, wol, swol
 
 
+# ================================================================ 02 разрез phi(alpha): выброс Ньютона на Розенброке
+def fig_phi_cut():
+    x1, p1 = line_at_x1()
+    al = np.linspace(0, 1, 2001)
+    phi = np.array([rosen(x1 + a * p1) for a in al])
+    a_min = al[np.argmin(phi)]
+    assert abs(phi[0] - 4.732) < 1e-3 and abs(phi[-1] - 1411.8) < 0.2, (phi[0], phi[-1])
+    assert abs(a_min - 0.110) < 0.002 and abs(phi.min() - 4.061) < 2e-3, (a_min, phi.min())
+    xe, xa = x1 + p1, x1 + a_min * p1
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4), gridspec_kw=dict(width_ratios=[1, 1.1]))
+    ax = axes[0]                                                   # линии уровня и шаг
+    rosen_contour(ax, xlim=(-2, 1.7), ylim=(-3.6, 2.2))
+    arrow(ax, x1, xe, RED, lw=2, ms=14)
+    ax.plot(*X0_ROSEN, "o", color=INK, ms=7, zorder=7)
+    ax.annotate("$x_0$", X0_ROSEN, (X0_ROSEN[0] - 0.45, X0_ROSEN[1] - 0.45), fontsize=11)
+    ax.plot(*x1, "o", color=BLUE, ms=8, zorder=8)
+    ax.annotate("$x_1$", x1, (x1[0] - 0.45, x1[1] + 0.2), color=BLUE, fontsize=11)
+    ax.plot(*xe, "x", color=RED, ms=12, mew=2.5, zorder=8)
+    ax.annotate(r"$\alpha=1$: $f=1412$", xe, (xe[0] - 1.9, xe[1] + 0.05), color=RED, fontsize=11)
+    ax.plot(*xa, "s", color=AQUA, ms=8, zorder=9)
+    ax.annotate(r"$\alpha=0.11$: $f=4.06$", xa, (xa[0] + 0.12, xa[1] + 0.12), color="#0c7a54", fontsize=11)
+    ax.plot(1, 1, "*", color=RED, ms=14, zorder=7)
+    ax.annotate("$x^*$", (1, 1), (1.15, 0.75), color=RED, fontsize=11)
+    ax.set(xlabel="$x_1$", ylabel="$x_2$", title="Розенброк: шаг Ньютона $p_1$ из $x_1$")
+    ax = axes[1]                                                   # разрез вдоль шага
+    ax.semilogy(al, phi, color=INK, lw=2.2)
+    ax.plot(0, phi[0], "o", color=BLUE, ms=8, zorder=7)
+    ax.annotate(r"$\varphi(0)=4.73$", (0, phi[0]), (0.05, 2.3), color=BLUE, fontsize=11)
+    ax.plot(a_min, phi.min(), "s", color=AQUA, ms=8, zorder=8)
+    ax.annotate(r"$\alpha=0.11$: $4.06$", (a_min, phi.min()), (0.16, 2.9), color="#0c7a54", fontsize=11)
+    ax.plot(1, phi[-1], "x", color=RED, ms=12, mew=2.5, zorder=8)
+    ax.annotate(r"$\alpha=1$: $1412$", (1, phi[-1]), (0.62, 1100), color=RED, fontsize=11)
+    ax.set(xlim=(-0.02, 1.05), ylim=(1.8, 3000), xlabel=r"длина шага $\alpha$", ylabel=r"$\varphi(\alpha)=f(x_1+\alpha p_1)$",
+           title="разрез вдоль шага: длина врёт")
+    save("02_alpha_cut.png")
+    return a_min
+
+
 # ================================================================ 02 Армихо: зачем c1
 def fig_armijo_c1():
     x0 = 2.0; p = -(1 + x0 ** 2) * np.arctan(x0)                  # шаг Ньютона из крючка (арктангенс)
@@ -819,8 +858,7 @@ def fig_armijo_c1():
     k_fail = int(ks[np.argmax(dec < req)])
     assert k_fail == 12 and np.all(dec > 0) and abs(ak[-1] - 1) < 1e-4, (k_fail, ak[-1])
 
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4))
-    ax = axes[0]                                                   # прямая Армихо на phi из крючка
+    fig, ax = plt.subplots(figsize=(9, 4.6))                      # прямая Армихо на phi из введения
     ax.axvspan(0, acc[0.25], color=AQUA, alpha=0.12, lw=0)
     ax.plot(al, phi(al), color=INK, lw=2.2, label=r"$\varphi(\alpha)=f(2+\alpha p)$")
     ax.plot(al[al <= 0.5], phi(0) + al[al <= 0.5] * d0, ":", color=GRAY, lw=1.4, label="касательная в 0")
@@ -836,25 +874,6 @@ def fig_armijo_c1():
            title="Армихо: $\\varphi$ под прямой — шаг принят")
     ax.legend(loc="upper left", fontsize=10)
 
-    ax = axes[1]                                                   # уменьшение есть, сходимости нет
-    t = np.linspace(-2.3, 2.3, 400)
-    ax.plot(t, t ** 2, color=INK, lw=2.2)
-    n_show = 7
-    xs, ys = xk[:n_show], xk[:n_show] ** 2
-    for i in range(n_show - 1):
-        arrow(ax, (xs[i], ys[i]), (xs[i + 1], ys[i + 1]), RED, lw=1.2, ms=11, alpha=0.9 - 0.1 * i,
-              connectionstyle="arc3,rad=0.25")
-    ax.plot(xs, ys, "o", color=RED, ms=7, zorder=7)
-    for i, (dx, dy, ha) in enumerate(((-0.12, 0.25, "right"), (-0.12, 0.3, "right"), (0.12, 0.3, "left"))):
-        ax.annotate(f"$x_{i}={xs[i]:g}$", (xs[i], ys[i]), (xs[i] + dx, ys[i] + dy), color=RED, fontsize=11, ha=ha)
-    for v in (-1, 1):
-        ax.plot([v, v], [0, 1], ":", color=GRAY, lw=1)
-    ax.plot(0, 0, "*", color=AQUA, ms=14, zorder=7)
-    ax.text(0, 0.6, "$f(x_k)\\to1$\n$f'(x_k)\\to\\pm2$", ha="center", va="center", fontsize=11, color=INK)
-    ax.text(0.03, 0.97, f"$f$ убывает на $\\approx2^{{-k}}$,\nАрмихо просит $\\approx4c_1$:\n"
-            f"при $c_1=10^{{-4}}$ нарушено с $k={k_fail}$", transform=ax.transAxes, va="top", fontsize=10.5,
-            bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-    ax.set(xlim=(-2.3, 2.3), ylim=(-0.4, 4.6), xlabel="$x$", title="зачем $c_1$: $f$ убывает, но $f'\\to\\pm2$")
     save("02_armijo_c1.png")
     return k_fail
 
@@ -1207,6 +1226,7 @@ if __name__ == "__main__":
     k_gd400, k_cg400 = fig_hooks(R, B)
     fig_atan_newton(R)
     fig_review(R)
+    a_cut = fig_phi_cut()
     arm, wol, swol = fig_armijo_wolfe()
     k_fail = fig_armijo_c1()
     stat, floor = fig_bfgs_wolfe()
