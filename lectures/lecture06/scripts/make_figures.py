@@ -18,6 +18,8 @@
                       (с 15.10 в конспекте не показывается — только для упражнения 6.10 и демо)
   04_saddle_trap      Ньютон с Армихо приходит в седло, доверительная область — в минимум
                       (с 15.10 в конспекте не показывается — для демо (e), упражнения 6.2 и семинара)
+  05_tr_model         функция введения + x2^2/2 из (2, 1): парабола-модель против функции; Ньютон улетает,
+                      доверительная область — 6 итераций
   05_tr_subproblem    подзадача доверительной области: точка Коши, dogleg, точный шаг
   06_tr_rosenbrock    доверительная область на Розенброке: путь, Delta_k и rho_k
   07_basins_three     Химмельблау: чистый Ньютон / Ньютон с Армихо / доверительная область
@@ -1045,6 +1047,76 @@ def fig_tr_subproblem():
     return np.linalg.norm(pN), lam2
 
 
+# ================================================================ 05 парабола-модель против функции
+def fig_tr_model():
+    """Функция введения с добавленной второй координатой f = x1 arctan x1 - 1/2 ln(1+x1^2) + 1/2 x2^2 из (2, 1):
+    модель — параболоид с вершиной в (-3.54, 0), где m = -1.65, а f = 3.28. Ньютон прыгает в вершину и улетает
+    (-3.54, 13.95, -279, ...), доверительная область (Delta_0 = 1) приходит в (0, 0) за 6 итераций без отказов;
+    первый шаг на границе круга: m = 0.65, f = 0.67, rho = 0.98."""
+    f2 = lambda x: x[0] * np.arctan(x[0]) - 0.5 * np.log1p(x[0] ** 2) + 0.5 * x[1] ** 2
+    g2 = lambda x: np.array([np.arctan(x[0]), x[1]])
+    h2 = lambda x: np.diag([1 / (1 + x[0] ** 2), 1.0])
+    x0 = np.array([2.0, 1.0])
+    f0, g, B = f2(x0), g2(x0), h2(x0)
+    m = lambda p: f0 + g @ p + 0.5 * p @ B @ p
+    pN = -np.linalg.solve(B, g); xN = x0 + pN
+    assert np.allclose(xN, [-3.536, 0], atol=2e-3) and abs(m(pN) + 1.655) < 2e-3 and abs(f2(xN) - 3.278) < 2e-3, (xN, m(pN), f2(xN))
+    xt, kt, pt, ht = trust_region(f2, g2, h2, x0, step="exact")
+    assert kt == 6 and all(h[4] for h in ht) and np.allclose(xt, 0, atol=1e-6), (kt, xt)
+    p0, rho0 = ht[0][1], ht[0][3]
+    assert abs(np.linalg.norm(p0) - 1) < 1e-6 and abs(m(p0) - 0.650) < 2e-3 and abs(f2(x0 + p0) - 0.674) < 2e-3 and abs(rho0 - 0.981) < 2e-3
+    assert ht[1][2] == 2.0 and abs(np.linalg.norm(ht[1][1]) - 1.981) < 2e-3      # второй шаг — полный ньютоновский внутри круга
+    _, _, pn = newton(g2, h2, x0, maxit=4)
+    assert np.allclose(pn[1], [-3.536, 0], atol=2e-3) and abs(pn[2][0] - 13.95) < 0.01, pn[:3]
+
+    def contours(ax, xlim, ylim, n=500):
+        X, Y = np.meshgrid(np.linspace(*xlim, n), np.linspace(*ylim, n))
+        F = X * np.arctan(X) - 0.5 * np.log1p(X ** 2) + 0.5 * Y ** 2
+        ax.contour(X, Y, F, levels=[0.1, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5], colors=GRAY, linewidths=0.7, alpha=0.8)
+        ax.plot(0, 0, "*", color=RED, ms=14, zorder=7)
+        ax.set(xlim=xlim, ylim=ylim, aspect="equal", xlabel="$x_1$", ylabel="$x_2$")
+        return X, Y
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.6))
+    ax = axes[0]                                                   # модель против функции
+    X, Y = contours(ax, (-5.6, 3.4), (-3.4, 3.4))
+    P1, P2 = X - x0[0], Y - x0[1]
+    M = f0 + g[0] * P1 + g[1] * P2 + 0.5 * (B[0, 0] * P1 ** 2 + B[1, 1] * P2 ** 2)
+    ax.contour(X, Y, M, levels=m(pN) + np.array([0.25, 1, 2.25, 4, 6.25]), colors=BLUE, linestyles="--", linewidths=1.1)
+    ax.add_patch(Circle(x0, 1.0, fill=False, lw=1.4, color=INK))
+    ax.text(x0[0] + 0.45, x0[1] - 1.35, "$\\Delta=1$", fontsize=10)
+    arrow(ax, x0, xN, RED, lw=2, ms=14)
+    ax.plot(*xN, "x", color=RED, ms=12, mew=2.5, zorder=8)
+    ax.annotate("вершина модели: $m=-1.65$,\nна деле $f=3.28$", xN, (xN[0] - 1.95, xN[1] - 2.0), color=RED, fontsize=10)
+    xs = x0 + p0
+    ax.plot(*xs, "s", color=AQUA, ms=8, zorder=9)
+    ax.annotate("$\\Delta=1$: модель $0.65$,\nна деле $0.67$ — принят", xs, (xs[0] - 3.35, xs[1] + 2.05), color="#0c7a54", fontsize=10,
+                arrowprops=dict(arrowstyle="-", color="#0c7a54", lw=0.8))
+    ax.plot(*x0, "o", color=INK, ms=7, zorder=9)
+    ax.annotate("старт $(2,1)$", x0, (x0[0] - 1.05, x0[1] + 1.2), fontsize=10)
+    ax.plot([], [], "--", color=BLUE, label="парабола-модель в $(2,1)$")
+    ax.plot([], [], "-", color=GRAY, label="функция $f$")
+    ax.legend(loc="lower right", fontsize=10)
+    ax.set(title="модель против функции")
+
+    ax = axes[1]                                                   # два пути
+    contours(ax, (-4.5, 3.4), (-3.0, 3.0))
+    ax.plot([x0[0], xN[0]], [x0[1], xN[1]], "-", color=RED, lw=1.8, zorder=6)
+    ax.plot(*xN, "x", color=RED, ms=11, mew=2.5, zorder=8)
+    arrow(ax, xN, (3.2, -0.6), RED, lw=1.8, ms=14)
+    ax.text(-0.9, -1.15, "дальше $13.95$, $-279$ …", color=RED, fontsize=10)
+    for xk, p, D, rho, acc in ht[:2]:
+        ax.add_patch(Circle(xk, D, fill=False, lw=1.0, color=BLUE, alpha=0.6))
+    ax.plot(pt[:, 0], pt[:, 1], "-o", color=BLUE, lw=2, ms=6, zorder=9)
+    ax.plot(*x0, "o", color=INK, ms=7, zorder=10)
+    ax.plot([], [], "-", color=RED, label="Ньютон: улетает")
+    ax.plot([], [], "-o", color=BLUE, label=f"доверительная область: {kt} итераций")
+    ax.legend(loc="lower left", fontsize=10)
+    ax.set(title="два пути из $(2,1)$")
+    save("05_tr_model.png")
+    return kt
+
+
 # ================================================================ 06 доверительная область на Розенброке
 def fig_tr_rosenbrock(R):
     kt, pt, ht, rej, kdl, kc = R["tr_rosen"]
@@ -1240,6 +1312,7 @@ if __name__ == "__main__":
     k_fail = fig_armijo_c1()
     stat, floor = fig_bfgs_wolfe()
     kl, kt, xl = fig_saddle_trap()
+    fig_tr_model()
     pnorm, lam2 = fig_tr_subproblem()
     fig_tr_rosenbrock(R)
     fig_basins_three(B)
