@@ -172,36 +172,90 @@ ax.legend(); plt.show()''')
 # ============================================================ (b)
 md(r"""## (b) Доверительная область: $\rho$, точка Коши, dogleg
 
-**Что проверяем.** Модельная задача §3.3: $g=(3,4)$, $B=\operatorname{diag}(1,5)$ — точка Ньютона $(-3,-0.8)$, модель в ней $-6.1$; при $\Delta=2$ точка Коши $(-0.84,-1.12)$ с моделью $-3.51$, dogleg $-5.21$, точный шаг $-5.44$. Затем метод целиком на Розенброке: $25$ итераций, из них $3$ пробных шага отвергнуты.""")
+**Что проверяем.** Модельная задача §3.3: $g=(3,4)$, $B=\operatorname{diag}(1,5)$ — точка Ньютона $(-3,-0.8)$, модель в ней $-6.1$; при $\Delta=2$ точка Коши $(-0.84,-1.12)$ с моделью $-3.51$, dogleg $-5.21$, точный шаг $-5.44$. Затем метод целиком на Розенброке: $25$ итераций, из них $3$ пробных шага отвергнуты. В каждой ячейке — числа и картинка.""")
 
-code(r'''g_t, B_t = np.array([3.0, 4.0]), np.diag([1.0, 5.0])   # модель-чаша из §3.3
-m = lambda p: g_t @ p + 0.5 * p @ B_t @ p
+code(r"""g_t, B_t = np.array([3.0, 4.0]), np.diag([1.0, 5.0])   # модель-чаша из §3.3
+m = lambda p: g_t @ p + 0.5 * p @ B_t @ p                 # модель m(p) (без постоянной f_k)
 pN = -np.linalg.solve(B_t, g_t); pU = -(g_t @ g_t) / (g_t @ B_t @ g_t) * g_t
 print(f"точка Ньютона {pN}, |pN| = {np.linalg.norm(pN):.3f}, m = {m(pN):.3f};  минимум вдоль -g: {pU.round(3)}, |pU| = {np.linalg.norm(pU):.3f}")
 for D in [1.0, 2.0, 3.0, 4.0]:
     pc, pd, pe = cauchy_point(g_t, B_t, D), dogleg(g_t, B_t, D), tr_exact(g_t, B_t, D)
-    print(f"Δ = {D}: Коши {pc.round(3)} m = {m(pc):7.3f} | dogleg {pd.round(3)} m = {m(pd):7.3f} | точный {pe.round(3)} m = {m(pe):7.3f}")''')
+    print(f"Δ = {D}: Коши {pc.round(3)} m = {m(pc):7.3f} | dogleg {pd.round(3)} m = {m(pd):7.3f} | точный {pe.round(3)} m = {m(pe):7.3f}")
 
-md(r"""Точный шаг всегда не хуже dogleg, dogleg — не хуже точки Коши; при $\Delta\ge\lVert p_N\rVert=3.10$ все три — точка Ньютона. **Предскажите до запуска:** сколько итераций сделает доверительная область на Розенброке, если брать *только* точку Коши? (Подсказка: это спуск с точным шагом, обрезанным шаром.)""")
+Ds = np.linspace(0.05, 4.0, 200)                           # радиусы
+fig, ax = plt.subplots(figsize=(8, 4))
+for name, solver, col in [("точка Коши", cauchy_point, YELLOW), ("dogleg", dogleg, ORANGE), ("точный шаг", tr_exact, BLUE)]:
+    ax.plot(Ds, [m(solver(g_t, B_t, D)) for D in Ds], color=col, lw=2.2, label=name)   # модель в найденном шаге
+    ax.plot(2.0, m(solver(g_t, B_t, 2.0)), "o", color=col, mec=INK, ms=7, zorder=5)     # Δ = 2 — числа конспекта
+ax.axhline(m(pN), color=RED, ls="--", lw=1.2, label=f"точка Ньютона: m = {m(pN):.1f}")  # ниже не опустится никто
+ax.axvline(np.linalg.norm(pN), color=GRAY, ls=":", lw=1.2)                               # |pN| = 3.10: дальше все три совпадают
+ax.text(np.linalg.norm(pN) + 0.05, -4.6, "$\\Delta=\\|p_N\\|$", color=GRAY)
+ax.set(xlabel="радиус $\\Delta$", ylabel="модель в найденном шаге", title="точнее решаем подзадачу — ниже модель")
+ax.legend(loc="upper right")
+plt.show()""")
 
-code(r'''for step in ["exact", "dogleg", "cauchy"]:
+md(r"""Точный шаг всегда не хуже dogleg, dogleg — не хуже точки Коши; при $\Delta\ge\lVert p_N\rVert=3.10$ все три — точка Ньютона. Точка Коши перестаёт расти уже при $\Delta=1.40$: дальше вдоль $-g$ модель не убывает. **Предскажите до запуска:** сколько итераций сделает доверительная область на Розенброке, если брать *только* точку Коши? (Подсказка: это спуск с точным шагом, обрезанным шаром.)""")
+
+code(r"""runs = {}
+for step in ["exact", "dogleg", "cauchy"]:
     t0 = time.perf_counter()
     x, k, path, hist = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step=step)
+    runs[step] = (k, path)                                  # число итераций и принятые точки
     rej = sum(not h[4] for h in hist)
     print(f"{step:7s}: {k:6d} итераций, отвергнуто {rej}, x = {x.round(6)}, {time.perf_counter() - t0:.1f} с")
-print("в конспекте: 25 (3 отвергнуты), 24, 14 110; спуск с backtracking из Л4 — 13 756")''')
+print("в конспекте: 25 (3 отвергнуты), 24, 14 110; спуск с backtracking из Л4 — 13 756")
 
-md(r"""**Таблица $\Delta_k$ и $\rho_k$** для точного шага: на итерации $1$ — тот самый выброс Л5 — шаг обрезан до $\Delta=1$, и всё равно $\rho<0$: шаг отвергнут, радиус вчетверо меньше.""")
+fig, axs = plt.subplots(1, 2, figsize=(9, 4))
+rosen_contour(axs[0], xlim=(-1.5, 1.5), ylim=(-0.6, 1.6))                         # линии уровня Розенброка
+for step, col in [("cauchy", ORANGE), ("dogleg", AQUA), ("exact", BLUE)]:
+    k, path = runs[step]
+    style = dict(lw=0.8) if step == "cauchy" else dict(marker=".", ms=6, lw=1.8)   # у Коши 14 тысяч точек — тонкой линией
+    axs[0].plot(path[:, 0], path[:, 1], color=col, label=f"{step}: {k}", **style)
+    axs[1].loglog(np.arange(1, len(path) + 1), [np.linalg.norm(rosen_grad(q)) for q in path], color=col, lw=1.8, label=step)
+axs[0].plot(*X0_ROSEN, "o", color=INK, ms=7, zorder=8)
+axs[0].set_title("пути из $(-1.2,1)$"); axs[0].legend(loc="lower right")
+axs[1].axhline(1e-6, color=GRAY, ls=":", lw=1)                                     # критерий останова
+axs[1].set(xlabel="принятый шаг", ylabel="$\\|\\nabla f\\|$", title="Коши ползёт, dogleg и точный — нет")
+plt.show()""")
 
-code(r'''x, k, path, hist = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step="exact")
+md(r"""**$\Delta_k$ и $\rho_k$ по итерациям** для точного шага. На итерации $1$ — тот самый выброс шага Ньютона длиной $4.95$ — шаг обрезан до $\Delta=1$, и всё равно $\rho<0$: шаг отвергнут, радиус вчетверо меньше. Ниже — первые итерации числами, все — на картинке: сверху $\rho_k$, снизу сам радиус. Цвет столбца — что сделали с радиусом: красный — $\Delta/4$, серый — без изменений, зелёный — можно расти; чёрная рамка — шаг отвергнут.""")
+
+code(r"""x, k, path, hist = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step="exact")
 print(" k    Δ_k      ρ_k     шаг     |p|")
-for i, (xk, p, D, rho, acc) in enumerate(hist):
-    print(f"{i:2d}  {D:7.4f}  {rho:7.3f}   {'принят ' if acc else 'ОТВЕРГ.'}  {np.linalg.norm(p):.3f}")''')
+for i, (xk, p, D, rho, acc) in enumerate(hist[:6]):                                # первые шесть попыток
+    print(f"{i:2d}  {D:7.4f}  {rho:7.3f}   {'принят ' if acc else 'ОТВЕРГ.'}  {np.linalg.norm(p):.3f}")
 
-md(r"""**Отрицательная кривизна.** Из ловушки $(0.58,2.15)$ доверительная область приходит в минимум $(3,2)$ — за $7$ итераций, без всякого сдвига: в шаре минимум модели есть всегда.""")
+it = np.arange(len(hist))
+rho = np.array([h[3] for h in hist]); Dk = np.array([h[2] for h in hist]); acc = np.array([h[4] for h in hist])
+col = np.where(rho < 0.25, RED, np.where(rho > 0.75, AQUA, GRAY))                 # Δ/4 / рост, если на границе / без изменений
+fig, (a1, a2) = plt.subplots(2, 1, figsize=(9, 5), sharex=True, gridspec_kw=dict(height_ratios=[1.3, 1]))
+a1.bar(it, rho, color=col, edgecolor=np.where(acc, "none", INK), linewidth=1.2)  # чёрная рамка — шаг отвергнут
+for level in (0.25, 0.75):
+    a1.axhline(level, color=GRAY, ls=":", lw=1)
+a1.axhline(0, color=INK, lw=0.8)
+a1.set(ylabel="$\\rho_k$", title="$\\rho_k$ решает, что делать с радиусом")
+a2.step(it, Dk, where="post", color=BLUE, lw=2)
+a2.set(yscale="log", xlabel="попытка $k$ (с отвергнутыми)", ylabel="$\\Delta_k$")
+plt.show()""")
 
-code(r'''x, k, path, hist = trust_region(him, him_grad, him_hess, (0.58, 2.15), step="exact", tol=1e-10)
-print(f"доверительная область: {k} итераций → {x.round(6)}; λ_min гессиана в старте = {np.linalg.eigvalsh(him_hess(np.array([0.58, 2.15])))[0]:.1f}")''')
+md(r"""**Отрицательная кривизна.** Из ловушки $(0.58,2.15)$ доверительная область приходит в минимум $(3,2)$ — за $7$ итераций, без всякого сдвига: в шаре минимум модели есть всегда. Для сравнения на картинке — Ньютон с Армихо из той же точки: он приходит в седло $(0.09,\,2.88)$.""")
+
+code(r"""x, k, path, hist = trust_region(him, him_grad, him_hess, (0.58, 2.15), step="exact", tol=1e-10)
+print(f"доверительная область: {k} итераций → {x.round(6)}; λ_min гессиана в старте = {np.linalg.eigvalsh(him_hess(np.array([0.58, 2.15])))[0]:.1f}")
+x_s, k_s, path_s = newton_ls(him, him_grad, him_hess, (0.58, 2.15))               # Ньютон с Армихо — для сравнения
+
+fig, ax = plt.subplots(figsize=(7, 5))
+him_contour(ax, lim=4.5)                                                           # линии уровня Химмельблау
+for xk, p, D, rho, acc in hist[:2]:
+    ax.add_patch(plt.Circle(xk, D, fill=False, color=BLUE, alpha=0.5, lw=1.2))    # круги доверия первых двух итераций
+ax.plot(path[:, 0], path[:, 1], "o-", color=BLUE, ms=5, lw=1.8, label=f"доверительная область: {k} → минимум")
+ax.plot(path_s[:, 0], path_s[:, 1], "s-", color=ORANGE, ms=5, lw=1.8, label=f"Ньютон + Армихо: {k_s} → седло")
+ax.plot(*x_s, "X", color=ORANGE, mec=INK, ms=11, zorder=8)                         # седло
+ax.plot(3, 2, "*", color=RED, ms=15, zorder=8)                                      # минимум
+ax.plot(0.58, 2.15, "o", color=INK, ms=8, zorder=9)                                 # старт
+ax.set(xlim=(-1.5, 4.5), ylim=(-0.5, 4.5), aspect="equal", xlabel="$x_1$", ylabel="$x_2$", title="Химмельблау: старт в ловушке седла")
+ax.legend(loc="lower left")
+plt.show()""")
 
 # ============================================================ (d)
 md(r"""## (d) Биография цепи и методы SciPy
