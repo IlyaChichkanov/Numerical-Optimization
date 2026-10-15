@@ -63,11 +63,12 @@ def put_statements() -> None:
 
 md(r"""# Разбор упражнений к лекции 6
 
-Условия — раздел 9 конспекта [`lecture06.md`](lecture06.md); краткие ответы без кода — [`exercises06.md`](exercises06.md). Все задачи домашние. **Сначала попробуйте сами**, потом сверяйтесь. Каждый разбор: условие с сутью → решение по пунктам → проверка кодом.""")
+Условия — раздел 9 конспекта [`lecture06.md`](lecture06.md); краткие ответы без кода — [`exercises06.md`](exercises06.md). Все задачи домашние. **Сначала попробуйте сами**, потом сверяйтесь. Каждый разбор: условие → решение по пунктам → проверка кодом и картинка там, где она помогает.""")
 
 code(r'''%matplotlib inline
 
 import numpy as np
+import matplotlib.pyplot as plt
 from l6helpers import *  # методы и задачи лекции (собираются из build_demo06.py)''')
 
 # ---------------------------------------------------------------- 6.0
@@ -116,6 +117,21 @@ print(f"(б) сдвиг «всегда»: {ka} итераций → {xa.round(4)
 
 md(r"""**(б)** При сдвиге «всегда, когда $\lambda_{\min}\le10^{-3}$» матрица $B_k\succ0$ на каждом шаге. Рядом с седлом компонента шага вдоль собственного вектора с отрицательным $\lambda$ направлена *от* седла (вдоль него функция убывает), поэтому седло отталкивает. Без сдвига направление Ньютона и так спуск — и метод честно идёт в седловую точку модели.""")
 
+md(r"""**Картинка.** Оба пути из одной точки: со сдвигом только при подъёме метод честно идёт в седло, со сдвигом «всегда» — в минимум $(3,2)$.""")
+
+code(r"""x_a, _, path_a = newton_ls(him, him_grad, him_hess, TRAP)                   # сдвиг tau I только при подъёме
+x_b, _, path_b = newton_ls(him, him_grad, him_hess, TRAP, shift="always")    # сдвиг всегда, когда lambda_min <= 1e-3
+fig, ax = plt.subplots(figsize=(6.5, 5))
+him_contour(ax, lim=4.5)                                                       # линии уровня Химмельблау
+ax.plot(path_a[:, 0], path_a[:, 1], "o-", color=ORANGE, ms=5, label="сдвиг только при подъёме → седло")
+ax.plot(path_b[:, 0], path_b[:, 1], "s-", color=BLUE, ms=5, label="сдвиг всегда → минимум")
+ax.plot(*TRAP, "o", color=INK, ms=8, zorder=8)                                 # старт
+ax.plot(*x_a, "X", color=ORANGE, mec=INK, ms=11, zorder=8)                     # седло
+ax.plot(*x_b, "*", color=RED, ms=14, zorder=8)                                 # минимум
+ax.set(xlim=(-1.5, 4.5), ylim=(-0.5, 4.5), title="Химмельблау из (0.58, 2.15)")
+ax.legend(loc="lower right")
+plt.show()""")
+
 # ---------------------------------------------------------------- 6.3
 md(r"""## 6.3. Точка Коши — спуск в маскировке
 
@@ -130,6 +146,19 @@ code(r'''for step in ["cauchy", "dogleg"]:
     print(f"{step}: {k} итераций")
 x, k, _ = gd(rosen, rosen_grad, X0_ROSEN)
 print(f"спуск с backtracking (Л4): {k} итераций")''')
+
+md(r"""**Картинка.** Норма градиента по итерациям: у точки Коши та же линейная скорость, что у спуска, у dogleg — ньютоновская.""")
+
+code(r"""fig, ax = plt.subplots(figsize=(7, 4))
+for step, col in [("cauchy", ORANGE), ("dogleg", BLUE)]:
+    _, k, path, _ = trust_region(rosen, rosen_grad, rosen_hess, X0_ROSEN, step=step)
+    ax.loglog(np.arange(1, len(path) + 1), [np.linalg.norm(rosen_grad(p)) for p in path], color=col, lw=1.8, label=f"{step}: {k}")
+_, k, path = gd(rosen, rosen_grad, X0_ROSEN)
+ax.loglog(np.arange(1, len(path) + 1), [np.linalg.norm(rosen_grad(p)) for p in path], color=GRAY, lw=1.8, label=f"спуск с backtracking: {k}")
+ax.axhline(1e-6, color=GRAY, ls=":", lw=1)
+ax.set(xlabel="итерация", ylabel="$\\|\\nabla f\\|$", title="точка Коши идёт со скоростью спуска")
+ax.legend()
+plt.show()""")
 
 # ---------------------------------------------------------------- 6.4
 md(r"""## 6.4. Dogleg руками
@@ -147,6 +176,25 @@ for D in (1.0, 2.6, 3.0):
     p = dogleg(g, B, D)
     print(f"Δ = {D}: dogleg {p.round(3)}, |p| = {np.linalg.norm(p):.3f}, модель {g @ p + 0.5 * p @ B @ p:.3f}")''')
 
+md(r"""**Картинка.** Эллипсы модели, ломаная и три круга: при $\Delta=1$ шаг на первом звене, при $\Delta=2.6$ — на втором, при $\Delta=3$ — точка Ньютона.""")
+
+code(r"""pB = -np.linalg.solve(B, g); pU = -(g @ g) / (g @ B @ g) * g              # точка Ньютона и минимум вдоль -g
+P1, P2 = np.meshgrid(np.linspace(-3.5, 1.5, 300), np.linspace(-3.5, 1.5, 300))
+M = g[0] * P1 + g[1] * P2 + 0.5 * (B[0, 0] * P1 ** 2 + B[1, 1] * P2 ** 2)   # модель m(p)
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.contour(P1, P2, M, levels=np.sort(0.5 * g @ pB + np.array([0.2, 0.8, 2, 4, 7, 11])), colors=GRAY, linewidths=0.7)
+ax.plot([0, pU[0], pB[0]], [0, pU[1], pB[1]], "--", color=ORANGE, lw=2, label="ломаная dogleg")
+for D, col in [(1.0, VIOLET), (2.6, BLUE), (3.0, AQUA)]:
+    ax.add_patch(plt.Circle((0, 0), D, fill=False, color=col, lw=1.2))
+    p = dogleg(g, B, D)
+    ax.plot(*p, "s", color=col, mec=INK, ms=9, label=f"Δ = {D:g}: шаг ({p[0]:.2f}, {p[1]:.2f})")
+ax.plot(*pU, "D", color=YELLOW, mec=INK, ms=9, label="минимум вдоль −g")
+ax.plot(*pB, "o", color=RED, mec=INK, ms=9, label="точка Ньютона")
+ax.plot(0, 0, "o", color=INK, ms=7)
+ax.set(xlim=(-3.5, 1.5), ylim=(-3.5, 1.5), aspect="equal", xlabel="$p_1$", ylabel="$p_2$")
+ax.legend(loc="upper left", fontsize=9)
+plt.show()""")
+
 # ---------------------------------------------------------------- 6.5
 md(r"""## 6.5. Левенберг–Марквардт = доверительная область
 
@@ -159,6 +207,19 @@ for lam in [0, 1, 10, 100]:
     p = -np.linalg.solve(JTJ + lam * np.eye(2), JTr)        # шаг Левенберга–Марквардта
     D = np.linalg.norm(p)
     print(f"λ = {lam:3d}: p = {p.round(4)}, Δ = |p| = {D:.4f}; точный шаг подзадачи при этом Δ: {tr_exact(JTr, JTJ, D).round(4)}")''')
+
+md(r"""**Картинка.** Длина шага Левенберга–Марквардта как функция $\lambda$: монотонно убывает, поэтому каждому $\Delta$ отвечает ровно один $\lambda$.""")
+
+code(r"""lam = np.geomspace(1e-2, 1e3, 200)
+norms = [np.linalg.norm(np.linalg.solve(JTJ + l * np.eye(2), JTr)) for l in lam]
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.loglog(lam, norms, color=BLUE, lw=2)
+for l in [1, 10, 100]:
+    D = np.linalg.norm(np.linalg.solve(JTJ + l * np.eye(2), JTr))
+    ax.plot(l, D, "o", color=RED, mec=INK, ms=8)
+    ax.annotate(f"λ = {l}: Δ = {D:.3f}", (l, D), (l * 1.4, D * 1.4), fontsize=10)
+ax.set(xlabel="λ", ylabel="длина шага = радиус Δ", title="больше λ — короче шаг — меньше Δ")
+plt.show()""")
 
 MD_TEXT = r"""# Упражнения к лекции 6 — краткие ответы
 
