@@ -10,7 +10,8 @@
 Картинки в порядке появления в конспекте:
   00_hooks            три крючка: Ньютон на арктангенсе, бассейны Химмельблау, цепь N=400
   00_atan_newton      почему чистый Ньютон улетает на арктангенсе: парабола-модель и касательная к f'
-  01_review           повторение: пути четырёх методов на Розенброке и биография цепи
+  01_review           повторение: пути четырёх методов на Розенброке; справа те же методы на Химмельблау из (0, 0)
+                      (с 15.10 вместо биографии цепи — сопряжённых градиентов в лекции нет)
   02_alpha_cut        выброс Ньютона на Розенброке: шаг из x_1 на линиях уровня и разрез phi(alpha) вдоль него
   02_armijo_c1        правило Армихо: phi(alpha) из введения, касательная и прямая Армихо (одна панель)
   02_armijo_wolfe     phi(alpha) на Розенброке в x_1: допустимые по Армихо и Вольфе шаги
@@ -731,23 +732,33 @@ def fig_review(R):
     ax.set_title("Л4–Л5: одна формула, разные $B_k$ и $\\alpha_k$")
     ax.legend(loc="lower left", fontsize=10)
 
-    ax = axs[1]
-    k40, _, _ = gd_chain_count(40)
-    names = ["спуск, шаг $1/L$ (Л4)", "BFGS, точный шаг (Л5)", "Ньютон (Л5)", "сегодня: CG"]
-    vals = [k40, 20, 1, np.nan]
-    cols = [ORANGE, AQUA, RED, GRAY]
-    y = np.arange(len(names))[::-1]
-    ax.barh(y[:3], vals[:3], color=cols[:3], height=0.6)
-    ax.barh(y[3], 20, color="none", edgecolor=GRAY, ls="--", height=0.6)
-    for yi, v in zip(y[:3], vals[:3]):
-        ax.text(v * 1.3, yi, f"{v:,}".replace(",", " "), va="center", fontsize=11)
-    ax.text(1.3, y[3], "?", va="center", fontsize=16, color=GRAY, fontweight="bold")
-    ax.set_xscale("log"); ax.set_xlim(0.7, 1e5)
-    ax.set_yticks(y); ax.set_yticklabels(names)
-    ax.set(xlabel="итераций до $\\|\\nabla E\\|\\leq10^{-6}$", title="биография цепи, $N=40$")
-    ax.grid(axis="y", alpha=0)
+    ax = axs[1]                                                    # Химмельблау из (0, 0): те же четыре метода
+    x0h = np.array([0.0, 0.0])
+    xg, kg_h, pg_h = gd(him, him_grad, x0h)
+    xn, kn_h, pn_h = newton(him_grad, him_hess, x0h)
+    xd, kd_h, pd_h = newton_ls(him, him_grad, him_hess, x0h)
+    xb, kb_h, pb_h = bfgs(him, him_grad, x0h)[:3]
+    kind = lambda x: ("минимум" if np.linalg.eigvalsh(him_hess(x))[0] > 0 else
+                      "максимум" if np.linalg.eigvalsh(him_hess(x))[1] < 0 else "седло")
+    assert kg_h == 25 and np.allclose(xg, [3, 2], atol=1e-4) and kind(xg) == "минимум", (kg_h, xg)
+    assert kn_h == 5 and np.allclose(xn, [-0.271, -0.923], atol=2e-3) and kind(xn) == "максимум", (kn_h, xn)
+    assert kd_h == 6 and np.allclose(xd, [3.584, -1.848], atol=2e-3) and kind(xd) == "минимум", (kd_h, xd)
+    assert kb_h == 10 and np.allclose(xb, [3, 2], atol=1e-4) and kind(xb) == "минимум", (kb_h, xb)
+    xlim, ylim = (-2.0, 4.8), (-4.1, 3.8)
+    X, Y = np.meshgrid(np.linspace(*xlim, 400), np.linspace(*ylim, 400))
+    F = (X ** 2 + Y - 11) ** 2 + (X + Y ** 2 - 7) ** 2
+    ax.contour(X, Y, F, levels=np.geomspace(0.5, 400, 14), colors=GRAY, linewidths=0.6, alpha=0.7)
+    ax.plot(pg_h[:, 0], pg_h[:, 1], "-", color=GRAY, lw=1.5, label=f"спуск: {kg_h} → $(3,2)$")
+    ax.plot(pn_h[:, 0], pn_h[:, 1], ".-", color=RED, lw=1.6, ms=6, label=f"Ньютон: {kn_h} → максимум")
+    ax.plot(pd_h[:, 0], pd_h[:, 1], ".-", color=BLUE, lw=1.6, ms=6, label=f"Ньютон + Армихо: {kd_h} → $(3.6,-1.8)$")
+    ax.plot(pb_h[:, 0], pb_h[:, 1], ".-", color=AQUA, lw=1.6, ms=6, label=f"BFGS: {kb_h} → $(3,2)$")
+    for m in ([3, 2], [3.584, -1.848], [-2.805, 3.131], [-3.779, -3.283]):
+        ax.plot(*m, "*", color=RED, ms=13, zorder=7)
+    ax.plot(*xn, "X", color=RED, mec=INK, ms=10, zorder=8)
+    ax.plot(*x0h, "o", color=INK, ms=8, zorder=9)
+    ax.set(xlim=xlim, ylim=ylim, aspect="equal", xlabel="$x_1$", ylabel="$x_2$", title="Химмельблау из $(0,0)$: куда кто пришёл")
+    ax.legend(loc="lower left", fontsize=10)
     save("01_review.png")
-    assert k40 == 10575, k40
 
 
 # ================================================================ 02 Армихо и Вольфе
