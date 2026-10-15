@@ -28,6 +28,7 @@
   08_cg_ellipse       эллипс kappa=50: спуск 567 против CG 2; цепь N=40: четыре метода
   09_cg_chain         цепь: итерации от N (спуск ~N^2, CG = N/2) и сходимость CG
   10_newton_cg        Розенброк в 1000 переменных: Newton-CG против L-BFGS-B
+                      (08–10 с 15.10 в конспекте не показываются: сопряжённые градиенты убраны из лекции 6)
 """
 
 import time
@@ -629,7 +630,7 @@ def runs():
 
 # ================================================================ 00 крючки
 def fig_hooks(R, B):
-    fig, axs = plt.subplots(1, 3, figsize=(9.2, 3.6))
+    fig, axs = plt.subplots(1, 2, figsize=(9, 4.2))
     ax = axs[0]
     sp = R["atan_pure"]; sd = R["atan_damped"]
     ax.plot(range(len(sp)), sp, "o-", color=RED, label="чистый Ньютон")
@@ -653,16 +654,9 @@ def fig_hooks(R, B):
             fontsize=10, va="bottom", bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
     ax.grid(False)
 
-    ax = axs[2]
-    k_gd, _, gnorm = gd_chain_count(400)
-    ks = np.unique(np.geomspace(1, k_gd, 300).astype(int))
-    ax.loglog(ks, [gnorm(k) for k in ks], color=ORANGE, label=f"спуск: {k_gd:,}".replace(",", " "))
+    k_gd, _, _ = gd_chain_count(400)                       # числа цепи остаются для сводки, панели нет с 15.10
     _, _, H, b, v0, _ = make_chain(400)
-    _, k_cg, hist = cg(lambda v: H @ v, -b, v0)
-    ax.loglog(np.arange(1, len(hist) + 1), hist, color=AQUA, label=f"CG: {k_cg}")
-    ax.axhline(1e-6, color=GRAY, ls=":", lw=1)
-    ax.set(xlabel="итерация $k$", ylabel=r"$\|\nabla E\|$", title="цепь из 400 грузов")
-    ax.legend(loc="lower left", fontsize=10)
+    _, k_cg, _ = cg(lambda v: H @ v, -b, v0)
     save("00_hooks.png")
     return k_gd, k_cg
 

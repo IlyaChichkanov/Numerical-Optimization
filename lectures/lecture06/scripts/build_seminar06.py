@@ -137,7 +137,7 @@ for shift in ["ascent", "always"]:
     results.append((f"Ньютон + Армихо ({shift})", k_l, fc.n, kind(x_l)))
 fc = Counter(fh); x_t, k_t, _, _ = trust_region(fc, gh, hh, X0, step="exact")
 results.append(("наша доверительная область", k_t, fc.n, kind(x_t)))
-for m_ in ["BFGS", "trust-exact", "Newton-CG"]:
+for m_ in ["BFGS", "trust-exact"]:
     kw = {"hess": hh} if m_ != "BFGS" else {}
     r = minimize(fh, X0, jac=gh, method=m_, **kw)
     results.append((f"SciPy {m_}", r.nit, r.nfev, kind(r.x)))
@@ -154,7 +154,7 @@ md(r"""## Итог
 - **IPOPT внутри — та же глобализация:** `regularization_size` — сдвиг гессиана $\delta I$ всякий раз, когда гессиан не положительно определён (поэтому IPOPT не приходит в сёдла Химмельблау), `alpha_pr` — backtracking (на Розенброке $0.125$ на второй итерации, как у нас).
 - Соревнование: из $(0,0)$ чистый Ньютон идёт в максимум; кто из остальных приходит в минимум дешевле всех — видно в таблице выше.
 
-**Дома:** упражнения 6.0–6.6 (разбор — [`exercises06.ipynb`](exercises06.ipynb)).""")
+**Дома:** упражнения 6.0–6.5 (разбор — [`exercises06.ipynb`](exercises06.ipynb)).""")
 
 
 def main() -> None:
