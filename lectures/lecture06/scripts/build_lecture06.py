@@ -11,7 +11,7 @@
     (b) доверительная область        -> после раздела 3, перед 4
     (c) сопряжённые градиенты        -> после раздела 4, перед 5
 
-Части (0) и (d) остаются только в demo06.ipynb.
+Части (0), (d) и (e) остаются только в demo06.ipynb.
 
 Заголовки частей «## (a) …» становятся «### Демо (a). …», чтобы не ломать
 нумерацию разделов конспекта. Вторая ячейка demo06 (импорты, палитра, методы, задачи)
@@ -64,7 +64,7 @@ def demo_parts() -> tuple[nbf.NotebookNode, dict[str, list[nbf.NotebookNode]]]:
                 current = None
         if current is not None:
             parts[current].append(cell)
-    assert set(parts) == {"0", "a", "b", "c", "d"}, sorted(parts)
+    assert set(parts) == {"0", "a", "b", "c", "d", "e"}, sorted(parts)
     return cells[1], parts
 
 

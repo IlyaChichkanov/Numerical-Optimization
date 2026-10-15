@@ -41,10 +41,11 @@ md(r"""# Демонстрации к лекции 6: линейный поиск
 Ноутбук — для самостоятельной проверки после пары: всё, что на лекции было формулой или картинкой, здесь считается кодом, а числа конспекта печатаются рядом с ожидаемыми. Читается сверху вниз; каждая часть начинается с «что проверяем и что должны увидеть».
 
 - **(0)** три задачи введения: Ньютон на арктангенсе — обещание параболы против правды, порог старта $1.39$; Химмельблау; цепь из 400 грузов;
-- **(a)** линейный поиск (раздел 2): $\varphi(\alpha)$, Армихо и Вольфе на Розенброке, backtracking $1\to\tfrac12\to\tfrac14\to\tfrac18$, $s^\top y$ у BFGS, цепь и масштаб $H_0$, ловушка седла;
+- **(a)** линейный поиск (раздел 2): $\varphi(\alpha)$, Армихо и Вольфе на Розенброке, backtracking $1\to\tfrac12\to\tfrac14\to\tfrac18$;
 - **(b)** доверительная область (раздел 3): модельная задача, точка Коши и dogleg, $25$ итераций на Розенброке с таблицей $\Delta_k,\rho_k$, только точка Коши — $14\,110$;
 - **(c)** сопряжённые градиенты (раздел 4): эллипс за $2$ шага, цепь за $N/2$, Newton-CG в $1000$ переменных;
 - **(d)** биография цепи и таблица методов SciPy (разделы 4–5).
+- **(e)** подробности линейного поиска (§2.2, §3.5): сильный Вольфе своими руками, $s^\top y$ у BFGS, цепь и масштаб $H_0$, ловушка седла.
 
 Конспект: [`lecture06.md`](lecture06.md). Запуск: `uv run jupyter lab` в корне репозитория. Пакеты — `numpy`, `scipy`, `matplotlib`; CasADi — только в семинаре.""")
 
@@ -132,66 +133,33 @@ _, k_cg, _ = cg(lambda v: H400 @ v, -b400, v400)
 print(f"цепь N = 400: κ = {kappa:.0f}, спуск 1/L — {k_gd} итераций, CG — {k_cg}   (в конспекте: 937 503 и 200)")''')
 
 # ============================================================ (a)
-md(r"""## (a) Линейный поиск: Армихо, Вольфе, глобальная сходимость
+md(r"""## (a) Линейный поиск: Армихо, Вольфе, backtracking
 
-**Что проверяем.** На Розенброке в точке $x_1$ (первая итерация Ньютона из $(-1.2,1)$) шаг Ньютона длиной $4.95$ ведёт в $f=1412$. Армихо выполнено при $\alpha\le0.176$, Вольфе ($c_2=0.9$) — при $0.044\le\alpha\le0.176$; backtracking пробует $1,\tfrac12,\tfrac14$ и принимает $\tfrac18$.""")
+**Что проверяем.** Числа §2.1–2.2: на Розенброке в $x_1$ (первая итерация Ньютона из $(-1.2,1)$) шаг Ньютона длиной $4.95$ ведёт в $f=1412$; Армихо выполнено при $\alpha\le0.176$, Вольфе ($c_2=0.9$) — при $0.044\le\alpha\le0.176$; backtracking пробует $1,\tfrac12,\tfrac14$ и принимает $\tfrac18$.""")
 
-code(r'''x1 = X0_ROSEN - np.linalg.solve(rosen_hess(X0_ROSEN), rosen_grad(X0_ROSEN))
-p1 = -np.linalg.solve(rosen_hess(x1), rosen_grad(x1))
-phi = lambda a: rosen(x1 + a * p1)
-dphi = lambda a: rosen_grad(x1 + a * p1) @ p1
-print(f"x1 = {x1.round(4)}, |p1| = {np.linalg.norm(p1):.3f}, φ(0) = {phi(0):.3f}, φ(1) = {phi(1):.1f}, φ'(0) = {dphi(0):.3f}")
+code(r'''x1 = X0_ROSEN - np.linalg.solve(rosen_hess(X0_ROSEN), rosen_grad(X0_ROSEN))   # x1: первая итерация Ньютона из (-1.2, 1)
+p1 = -np.linalg.solve(rosen_hess(x1), rosen_grad(x1))                           # p1: шаг Ньютона в x1 (длина 4.95)
+phi = lambda a: rosen(x1 + a * p1)              # разрез f вдоль шага: phi(alpha) = f(x1 + alpha * p1)
+dphi = lambda a: rosen_grad(x1 + a * p1) @ p1   # производная разреза по правилу сложной функции: grad f(x1 + alpha p1) . p1
+print(f"x1 = {x1.round(4)}, |p1| = {np.linalg.norm(p1):.3f}, φ(0) = {phi(0):.3f}, φ(1) = {phi(1):.1f}, φ'(0) = {dphi(0):.3f}   (в конспекте: 4.95, 4.73, 1412, -8.43)")
 
-al = np.linspace(0, 0.3, 30001)
-arm = np.array([phi(a) <= phi(0) + 1e-4 * a * dphi(0) for a in al])
-wol = arm & np.array([dphi(a) >= 0.9 * dphi(0) for a in al])
+al = np.linspace(0, 0.3, 30001)                                        # сетка длин шага alpha
+arm = np.array([phi(a) <= phi(0) + 1e-4 * a * dphi(0) for a in al])   # правило Армихо: phi под прямой с наклоном c1 phi'(0), c1 = 1e-4
+wol = arm & np.array([dphi(a) >= 0.9 * dphi(0) for a in al])          # плюс условие кривизны Вольфе: наклон стал положе, c2 = 0.9
 print(f"Армихо: α ≤ {al[arm].max():.3f};  Вольфе: {al[wol].min():.3f} ≤ α ≤ {al[wol].max():.3f}   (в конспекте: 0.176; 0.044–0.176)")
 
-for a in [1, 0.5, 0.25, 0.125]:
+for a in [1, 0.5, 0.25, 0.125]:                                        # backtracking: alpha = 1, затем пополам, пока Армихо не выполнено
     ok = phi(a) <= phi(0) + 1e-4 * a * dphi(0)
     print(f"  α = {a:<6g} φ = {phi(a):9.3f}  Армихо: {'да — принят' if ok else 'нет'}")''')
 
 code(r'''fig, ax = plt.subplots(figsize=(8, 3.6))
-ax.plot(al, [phi(a) for a in al], color=INK, label=r"$\varphi(\alpha)$")
-ax.plot(al, phi(0) + 1e-4 * al * dphi(0), "--", color=ORANGE, label="прямая Армихо")
-ax.axvspan(al[wol].min(), al[wol].max(), color=AQUA, alpha=0.2, label="Вольфе")
-for a, col in [(0.02, YELLOW), (0.125, AQUA), (0.25, RED)]:
-    ax.plot(a, phi(a), "o", color=col, ms=9, mec=INK)
+ax.plot(al, [phi(a) for a in al], color=INK, label=r"$\varphi(\alpha)$")                 # разрез phi(alpha)
+ax.plot(al, phi(0) + 1e-4 * al * dphi(0), "--", color=ORANGE, label="прямая Армихо")       # прямая Армихо: phi(0) + c1 alpha phi'(0)
+ax.axvspan(al[wol].min(), al[wol].max(), color=AQUA, alpha=0.2, label="Вольфе")            # допустимые по Вольфе шаги
+for a, col in [(0.02, YELLOW), (0.125, AQUA), (0.25, RED)]:                                 # три кандидата из «вопроса залу»
+    ax.plot(a, phi(a), "o", color=col, ms=9, mec=INK)                                        #   0.02 — только Армихо, 0.125 — оба, 0.25 — ни одного
 ax.set(ylim=(3.6, 9.6), xlabel=r"$\alpha$", title="Розенброк в $x_1$ вдоль шага Ньютона")
 ax.legend(); plt.show()''')
-
-md(r"""**Сильный Вольфе своими руками.** Функция `wolfe` из второй ячейки (Nocedal & Wright, алгоритмы 3.5–3.6) на той же прямой: какой шаг она вернёт и сколько вычислений ей понадобится?""")
-
-code(r'''a, f_new, g_new, nf = wolfe(rosen, rosen_grad, x1, p1, rosen(x1), rosen_grad(x1))
-print(f"сильный Вольфе: α = {a:.4f}, φ = {f_new:.4f}, |φ'(α)| / |φ'(0)| = {abs(g_new @ p1) / abs(dphi(0)):.3f} (≤ 0.9), вычислений {nf}")''')
-
-md(r"""**Зачем Вольфе квази-Ньютону.** Условие кривизны гарантирует $s^\top y>0$. Проверяем на Химмельблау: BFGS из $400$ случайных стартов (`default_rng(2026)`), считаем шаги с $s^\top y\le0$. Ожидаем: с одним Армихо — $72$ запуска и $179$ таких шагов, с Вольфе — ни одного.""")
-
-code(r'''rng = np.random.default_rng(2026)
-starts = rng.uniform(-6, 6, (400, 2))
-for line in ["armijo", "wolfe"]:
-    runs_bad = steps_bad = 0
-    for x0 in starts:
-        _, _, _, _, sy = bfgs(him, him_grad, x0, line=line, maxit=5000)
-        neg = int(np.sum(sy[:, 0] <= 0)); runs_bad += neg > 0; steps_bad += neg
-    print(f"{line:7s}: запусков с s^T y <= 0 — {runs_bad} из 400, таких шагов — {steps_bad}")''')
-
-md(r"""**Цепь: виноват масштаб $H_0$, а не Вольфе.** Энергия цепи — выпуклая квадратичная функция: $s^\top y=s^\top Hs>0$ при любом шаге, условие Вольфе ничего не добавляет. С $H_0=I$ BFGS застревает и с Армихо, и с Вольфе; с $H_0\leftarrow\frac{s^\top y}{y^\top y}I$ после первого шага — $27$ итераций.""")
-
-code(r'''E, gE, H, b, v0, unpack = make_chain(40)
-for line, sc in [("armijo", False), ("wolfe", False), ("armijo", True), ("wolfe", True)]:
-    x, k, _, nf, _ = bfgs(E, gE, v0, line=line, scale_H0=sc, maxit=3000)
-    print(f"{line:7s} H0 {'масштабирована' if sc else '= I          '}: {k:5d} итераций, {nf:6d} вычислений E, |∇E| = {np.linalg.norm(gE(x)):.1e}")
-lam_max = np.linalg.eigvalsh(H)[-1]
-E_star = E(np.linalg.solve(H, -b))
-print(f"пол округления sqrt(2 λmax ε |E*|) = {np.sqrt(2 * lam_max * np.finfo(float).eps * abs(E_star)):.2e}   (в конспекте ≈ 1.3e-6)")''')
-
-md(r"""**Глобальная сходимость — к стационарной точке.** Ньютон с Армихо из ловушки $(0.58,\,2.15)$ на Химмельблау: со сдвигом $\tau I$ только при подъёме (как в Л5 и ДЗ 3) — в седло за $5$ итераций, с «модифицированным Ньютоном» (сдвиг всякий раз, когда $\lambda_{\min}\le10^{-3}$) — в минимум.""")
-
-code(r'''for shift in ["ascent", "always"]:
-    x, k, _ = newton_ls(him, him_grad, him_hess, (0.58, 2.15), shift=shift)
-    lam = np.linalg.eigvalsh(him_hess(x))
-    print(f"сдвиг «{shift}»: {k} итераций → ({x[0]:.4f}, {x[1]:.4f}), |∇f| = {np.linalg.norm(him_grad(x)):.1e}, собственные числа {lam.round(2)}")''')
 
 # ============================================================ (b)
 md(r"""## (b) Доверительная область: $\rho$, точка Коши, dogleg
@@ -288,6 +256,44 @@ print(f"{'метод':13s} итераций  вычислений f   |∇f| в 
 for m, nit, nfev, gn in rows:
     print(f"{m:13s} {nit:7d}  {nfev:12d}   {gn:.1e}")
 print("в конспекте: BFGS 33/40, L-BFGS-B 37, CG 37/80, Newton-CG 85, trust-exact 25, dogleg 24, trust-ncg 29, trust-krylov 38")''')
+
+# ============================================================ (e)
+md(r"""## (e) Линейный поиск: подробности для самостоятельной проверки
+
+Четыре проверки к §2.2 и §3.5, которые на лекции не показываются: сильный Вольфе своими руками, $s^\top y$ у BFGS на Химмельблау, цепь и масштаб $H_0$ (упражнение 6.10), ловушка седла (упражнение 6.4).""")
+
+md(r"""**Сильный Вольфе своими руками.** Функция `wolfe` из второй ячейки (Nocedal & Wright, алгоритмы 3.5–3.6) на той же прямой: какой шаг она вернёт и сколько вычислений ей понадобится?""")
+
+code(r'''a, f_new, g_new, nf = wolfe(rosen, rosen_grad, x1, p1, rosen(x1), rosen_grad(x1))
+print(f"сильный Вольфе: α = {a:.4f}, φ = {f_new:.4f}, |φ'(α)| / |φ'(0)| = {abs(g_new @ p1) / abs(dphi(0)):.3f} (≤ 0.9), вычислений {nf}")''')
+
+md(r"""**Зачем Вольфе квази-Ньютону.** Условие кривизны гарантирует $s^\top y>0$. Проверяем на Химмельблау: BFGS из $400$ случайных стартов (`default_rng(2026)`), считаем шаги с $s^\top y\le0$. Ожидаем: с одним Армихо — $72$ запуска и $179$ таких шагов, с Вольфе — ни одного.""")
+
+code(r'''rng = np.random.default_rng(2026)
+starts = rng.uniform(-6, 6, (400, 2))
+for line in ["armijo", "wolfe"]:
+    runs_bad = steps_bad = 0
+    for x0 in starts:
+        _, _, _, _, sy = bfgs(him, him_grad, x0, line=line, maxit=5000)
+        neg = int(np.sum(sy[:, 0] <= 0)); runs_bad += neg > 0; steps_bad += neg
+    print(f"{line:7s}: запусков с s^T y <= 0 — {runs_bad} из 400, таких шагов — {steps_bad}")''')
+
+md(r"""**Цепь: виноват масштаб $H_0$, а не Вольфе.** Энергия цепи — выпуклая квадратичная функция: $s^\top y=s^\top Hs>0$ при любом шаге, условие Вольфе ничего не добавляет. С $H_0=I$ BFGS застревает и с Армихо, и с Вольфе; с $H_0\leftarrow\frac{s^\top y}{y^\top y}I$ после первого шага — $27$ итераций.""")
+
+code(r'''E, gE, H, b, v0, unpack = make_chain(40)
+for line, sc in [("armijo", False), ("wolfe", False), ("armijo", True), ("wolfe", True)]:
+    x, k, _, nf, _ = bfgs(E, gE, v0, line=line, scale_H0=sc, maxit=3000)
+    print(f"{line:7s} H0 {'масштабирована' if sc else '= I          '}: {k:5d} итераций, {nf:6d} вычислений E, |∇E| = {np.linalg.norm(gE(x)):.1e}")
+lam_max = np.linalg.eigvalsh(H)[-1]
+E_star = E(np.linalg.solve(H, -b))
+print(f"пол округления sqrt(2 λmax ε |E*|) = {np.sqrt(2 * lam_max * np.finfo(float).eps * abs(E_star)):.2e}   (в конспекте ≈ 1.3e-6)")''')
+
+md(r"""**Глобальная сходимость — к стационарной точке.** Ньютон с Армихо из ловушки $(0.58,\,2.15)$ на Химмельблау: со сдвигом $\tau I$ только при подъёме (как в Л5 и ДЗ 3) — в седло за $5$ итераций, с «модифицированным Ньютоном» (сдвиг всякий раз, когда $\lambda_{\min}\le10^{-3}$) — в минимум.""")
+
+code(r'''for shift in ["ascent", "always"]:
+    x, k, _ = newton_ls(him, him_grad, him_hess, (0.58, 2.15), shift=shift)
+    lam = np.linalg.eigvalsh(him_hess(x))
+    print(f"сдвиг «{shift}»: {k} итераций → ({x[0]:.4f}, {x[1]:.4f}), |∇f| = {np.linalg.norm(him_grad(x)):.1e}, собственные числа {lam.round(2)}")''')
 
 md(r"""## Шпаргалка
 
