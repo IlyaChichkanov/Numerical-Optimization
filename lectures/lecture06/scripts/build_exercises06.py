@@ -4,10 +4,13 @@
     uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture06/exercises06.ipynb
 
 Методы и задачи импортируются из l6helpers.py (собирается build_lecture06.py) — тот же код, что в демо.
+Условия задач берутся из раздела 9 lecture06.md при сборке и ставятся перед каждым решением
+(блок «Условие»), чтобы разбор не расходился с конспектом.
 Шесть задач (15.10: было одиннадцать) — разминка, теорема §2.3 для желающих, седло, точка Коши, dogleg,
 Левенберг–Марквардт; сопряжённые градиенты убраны вместе с разделом.
 """
 
+import re
 from pathlib import Path
 
 import nbformat as nbf
@@ -24,6 +27,38 @@ def md(text: str) -> None:
 
 def code(text: str) -> None:
     cells.append(nbf.v4.new_code_cell(text))
+
+
+def statements() -> dict[str, tuple[str, str, str]]:
+    """Условия задач из раздела 9 конспекта: номер -> (заголовок, вводная строка с сутью, текст условия)."""
+    src = (LECTURE / "lecture06.md").read_text(encoding="utf-8")
+    block = src[src.index("## 9. Упражнения"):src.index("## Вопросы для самопроверки")]
+    out: dict[str, tuple[str, str, str]] = {}
+    for chunk in re.split(r"\n(?=\*\*6\.\d\. )", block)[1:]:
+        first, _, rest = chunk.strip().partition("\n")
+        m = re.match(r"\*\*6\.(\d)\. (.+?)\*\*\s*(.*)$", first)
+        assert m, first
+        out[m.group(1)] = (m.group(2).rstrip("."), m.group(3).strip(), rest.strip())
+    return out
+
+
+def put_statements() -> None:
+    """Перед каждым решением «## 6.N. …» вставляет условие из конспекта и подпись «Решение»."""
+    st = statements()
+    seen = set()
+    for cell in cells:
+        if cell.cell_type != "markdown":
+            continue
+        m = re.match(r"## 6\.(\d)\. ([^\n]+)\n(?:\n\*Суть:[^\n]*\*\n?)?(.*)$", cell.source, re.S)
+        if not m:
+            continue
+        n, title, body = m.group(1), m.group(2).strip(), m.group(3).strip()
+        assert n in st and title == st[n][0], (n, title, st[n][0])
+        _, intro, text = st[n]
+        cell.source = (f"## 6.{n}. {title}\n\n**Условие.** {intro}\n\n{text}\n\n**Решение.**"
+                       + (f"\n\n{body}" if body else ""))
+        seen.add(n)
+    assert seen == set(st), (sorted(seen), sorted(st))
 
 
 md(r"""# Разбор упражнений к лекции 6
@@ -144,6 +179,7 @@ MD_TEXT = r"""# Упражнения к лекции 6 — краткие отв
 
 
 def main() -> None:
+    put_statements()
     nb = nbf.v4.new_notebook(cells=cells)
     nb.metadata.update({
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
