@@ -60,6 +60,9 @@ def rosen_grad(x):
 
 X0_ROSEN = np.array([-1.2, 1.0])
 
+X_SIN = np.array([1.0])                     # пример раздела 2: f = sin x в точке 1, f' = cos 1
+F_SIN = lambda x: np.sin(x[0])
+
 
 def tape_example(x1=2.0, x2=0.5, d=(1.0, 0.0)):
     """f = x1 x2 + sin(x1 x2) как список из трёх операций: значения, прямой режим по d, обратный режим.

@@ -4,17 +4,17 @@
 
 Скрипт самодостаточен: разности, пример из трёх операций и упругая цепь определены здесь тем же кодом,
 что в build_demo07.py / l7helpers.py; числа конспекта считаются в скрипте и проверяются ассертами.
-Картинки 00, 06, 07 считают через CasADi (граф энергии цепи, число операций, разреженность).
+Картинки 07, 08 считают через CasADi (граф энергии цепи, число операций, разреженность).
 
 Картинки в порядке появления в конспекте:
-  00_hooks            три факта введения: U-кривая, цена градиента от n (разности против обратного режима), гессиан цепи
   01_review           BFGS на Розенброке с точным и разностным градиентом: пути и норма точного градиента
-  02_fd_ucurve        U-кривые прямой и центральной разности для d f/dx1 Розенброка в (-1.2, 1)
-  03_fd_noise         те же U-кривые для f с относительным шумом 1e-10 (ответ на вопрос залу, §2.4)
-  04_graph_forward    граф вычислений f = x1 x2 + sin(x1 x2): значения и производные по направлению d = (1, 0)
-  05_graph_reverse    тот же граф назад: сопряжённые величины и градиент за один проход
-  06_cost             цена градиента и гессиана цепи в единицах цены энергии от n; время при n = 2000
-  07_sparsity         гессиан цепи 80x80: портрет ненулевых из CasADi и разностный гессиан с шумом
+  02_secants          sin x около x = 1, h = 0.5: касательная, прямая и центральная секущие с наклонами
+  03_fd_ucurve        U-кривые прямой и центральной разности для sin x в x = 1 и две оценки ошибок пунктиром
+  04_fd_noise         те же U-кривые для f с относительным шумом 1e-10 (ответ на вопрос залу, §2.8)
+  05_graph_forward    граф вычислений f = x1 x2 + sin(x1 x2): значения и производные по направлению d = (1, 0)
+  06_graph_reverse    тот же граф назад: сопряжённые величины и градиент за один проход
+  07_cost             цена градиента и гессиана цепи в единицах цены энергии от n; время при n = 2000
+  08_sparsity         гессиан цепи 80x80: портрет ненулевых из CasADi и разностный гессиан с шумом
 """
 
 import time
@@ -96,6 +96,9 @@ def rosen_grad(x):
 
 X0_ROSEN = np.array([-1.2, 1.0])
 
+X_SIN = np.array([1.0])                     # пример раздела 2: f = sin x в точке 1, f' = cos 1
+F_SIN = lambda x: np.sin(x[0])
+
 
 def tape_example(x1=2.0, x2=0.5, d=(1.0, 0.0)):
     """f = x1 x2 + sin(x1 x2) как список из трёх операций: значения, прямой режим по d, обратный режим.
@@ -163,11 +166,13 @@ def chain_costs(N):
 
 # ---------------------------------------------------------------- числа конспекта
 def numbers():
-    ex = rosen_grad(X0_ROSEN)[0]
-    ef, ec = ucurve(rosen, X0_ROSEN, 0, ex)
+    ex = np.cos(1.0)
+    ef, ec = ucurve(F_SIN, X_SIN, 0, ex)
     jf, jc = int(np.argmin(ef)), int(np.argmin(ec))
-    assert abs(ex + 215.6) < 1e-9 and 1e-9 < HS[jf] < 1e-7 and 1e-7 < HS[jc] < 1e-5, (HS[jf], HS[jc])
-    assert 1e-6 < ef[jf] < 2e-6 and 5e-10 < ec[jc] < 2e-9, (ef[jf], ec[jc])
+    assert 1e-9 < HS[jf] < 1e-7 and 1e-7 < HS[jc] < 1e-5, (HS[jf], HS[jc])
+    assert 1e-9 < ef[jf] < 5e-9 and 1e-13 < ec[jc] < 2e-12, (ef[jf], ec[jc])
+    table = {h: fd_forward(F_SIN, X_SIN, 0, h) for h in (1e-1, 1e-4, 1e-8, 1e-12)}   # таблица §2.2
+    assert abs(table[1e-1] - 0.49736) < 1e-5 and abs(table[1e-8] - ex) < 5e-9 and 1e-5 < abs(table[1e-12] - ex) < 1e-4, table
     costs = {N: chain_costs(N) for N in (40, 200, 1000)}
     for nf, ng, nh, nhd, nnz in costs.values():
         assert 1.5 < ng / nf < 1.7 and 5 < nh / nf < 6 and 3 < nhd / nf < 3.6
@@ -181,39 +186,8 @@ def ucurve_axes(ax, hs, curves, labels, colors, vlines=True):
     if vlines:
         for h0, txt in ((np.sqrt(EPS), r"$\sqrt{\varepsilon}$"), (EPS ** (1 / 3), r"$\varepsilon^{1/3}$")):
             ax.axvline(h0, color=GRAY, ls=":", lw=1.2)
-            ax.text(h0 * 1.4, 3e-13, txt, fontsize=12, color=GRAY)
+            ax.text(h0 * 1.4, 0.03, txt, fontsize=12, color=GRAY, transform=ax.get_xaxis_transform())
     ax.set(xlabel="шаг $h$", ylabel="ошибка производной")
-
-
-# ================================================================ 00 hooks
-def fig_hooks(num):
-    fig, axs = plt.subplots(1, 3, figsize=(8.7, 3.4), gridspec_kw=dict(width_ratios=[1.15, 1.15, 0.9]))
-    ax = axs[0]
-    ucurve_axes(ax, HS, [num["ef"]], ["прямая разность"], [BLUE], vlines=False)
-    ax.plot(HS[num["jf"]], num["ef"][num["jf"]], "o", color=RED, ms=7, zorder=7)
-    ax.annotate(f"лучшее: $h=6\\cdot10^{{-9}}$\nошибка $1.4\\cdot10^{{-6}}$", (HS[num["jf"]], num["ef"][num["jf"]]),
-                (3e-14, 1e-3), fontsize=9.5, arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8))
-    ax.set(title="Разность: половина знаков", ylim=(1e-8, 1e3), xticks=[1e-15, 1e-10, 1e-5, 1e0])
-    ax.legend(loc="upper right")
-    ax = axs[1]
-    ns = np.array([80, 400, 2000])
-    ratio_ad = np.array([num["costs"][N][1] / num["costs"][N][0] for N in (40, 200, 1000)])
-    nn = np.geomspace(10, 3e11, 100)
-    ax.loglog(nn, nn + 1, color=ORANGE, lw=1.8, label="разности: $n+1$")
-    ax.loglog(ns, ns + 1, "o", color=ORANGE, ms=6)
-    ax.axhline(ratio_ad.mean(), color=BLUE, lw=2.2, label="обратный режим: $1.6$")
-    ax.loglog(ns, ratio_ad, "o", color=BLUE, ms=6)
-    ax.plot(1.75e11, 1.75e11, "*", color=RED, ms=12, zorder=7); ax.plot(1.75e11, 2, "*", color=RED, ms=12, zorder=7)
-    ax.text(2e8, 3e9, "GPT-3", fontsize=10, color=RED); ax.text(2e8, 3.2, "GPT-3", fontsize=10, color=RED)
-    ax.set(xlabel="переменных $n$", ylabel="цена градиента, в ценах $f$", title="Цена не зависит от $n$",
-           xticks=[1e2, 1e5, 1e8, 1e11], ylim=(0.8, 3e12))
-    ax.legend(loc="upper left", fontsize=9.5)
-    ax = axs[2]
-    pattern, _, _ = chain_pattern(40)
-    ax.spy(pattern, markersize=1.6, color=INK)
-    ax.set(title="Гессиан цепи: 7 % ненулевых", xticks=[0, 40, 79], yticks=[0, 40, 79]); ax.grid(False)
-    ax.tick_params(labelsize=9)
-    save("00_hooks.png")
 
 
 # ================================================================ 01 review: BFGS с разностями
@@ -243,42 +217,65 @@ def fig_review():
     save("01_review.png")
 
 
-# ================================================================ 02 U-кривая
-def fig_fd_ucurve(num):
-    ef, ec, jf, jc = num["ef"], num["ec"], num["jf"], num["jc"]
+# ================================================================ 02 секущие
+def fig_secants():
+    x, h = 1.0, 0.5
+    ex = np.cos(x)
+    d_plus = (np.sin(x + h) - np.sin(x)) / h
+    d_zero = (np.sin(x + h) - np.sin(x - h)) / (2 * h)
+    assert abs(d_plus - 0.312) < 1e-3 and abs(d_zero - 0.518) < 1e-3 and abs(ex - 0.540) < 1e-3, (d_plus, d_zero, ex)
+    t = np.linspace(0.25, 1.85, 400)
     fig, ax = plt.subplots(figsize=(9, 4.6))
-    ucurve_axes(ax, HS, [ef, ec], ["прямая разность", "центральная разность"], [BLUE, ORANGE])
-    for j, e, col, txt in ((jf, ef, BLUE, f"$h=6\\cdot10^{{-9}}$, ошибка $1.4\\cdot10^{{-6}}$"),
-                           (jc, ec, ORANGE, f"$h=2.5\\cdot10^{{-6}}$, ошибка $10^{{-9}}$")):
+    ax.plot(t, np.sin(t), color=INK, lw=2.2, label="$f(x)=\\sin x$")
+    ax.plot(t, np.sin(x) + ex * (t - x), "--", color=GRAY, lw=1.8, label=f"касательная: $f'(1)=\\cos 1={ex:.3f}$")
+    ax.plot(t, np.sin(x) + d_plus * (t - x), color=BLUE, lw=2, label=f"прямая секущая через $1$ и $1.5$: $D_+={d_plus:.3f}$")
+    ax.plot(t, np.sin(x) + d_zero * (t - x), color=ORANGE, lw=2, label=f"центральная секущая через $0.5$ и $1.5$: $D_0={d_zero:.3f}$")
+    for px, col, lab, dy in ((x - h, ORANGE, "$x-h$", -0.09), (x, INK, "$x$", -0.09), (x + h, BLUE, "$x+h$", -0.09)):
+        ax.plot(px, np.sin(px), "o", color=col, ms=9, mec="white", mew=1.5, zorder=7)
+        ax.annotate(lab, (px, np.sin(px)), textcoords="offset points", xytext=(0, -18), ha="center", fontsize=11, color=col)
+    ax.set(xlim=(t[0], t[-1]), ylim=(0.1, 1.12), xlabel="$x$", ylabel="$f$", title="Секущие вместо касательной: $x=1$, $h=0.5$")
+    ax.legend(loc="upper left", fontsize=10)
+    save("02_secants.png")
+
+
+# ================================================================ 03 U-кривая
+def fig_fd_ucurve(num):
+    ef, ec, jf, jc, ex = num["ef"], num["ec"], num["jf"], num["jc"], num["ex"]
+    f0, f2 = np.sin(1.0), np.sin(1.0)                       # |f| и |f''| для sin x в точке 1
+    fig, ax = plt.subplots(figsize=(9, 4.8))
+    ax.loglog(HS, HS / 2 * f2, "--", color=BLUE, lw=1.3, alpha=0.8, label=r"оценка усечения $\frac{h}{2}|f''|$")
+    ax.loglog(HS, 2 * EPS * f0 / HS, "--", color=INK, lw=1.3, alpha=0.8, label=r"оценка округления $2\varepsilon|f|/h$")
+    ucurve_axes(ax, HS, [ef, ec], ["прямая разность: измерено", "центральная разность: измерено"], [BLUE, ORANGE])
+    for j, e, col, txt, xy in ((jf, ef, BLUE, "$h=2.5\\cdot10^{-9}$, ошибка $2\\cdot10^{-9}$", (-200, 10)),
+                               (jc, ec, ORANGE, "$h=3\\cdot10^{-6}$, ошибка $6\\cdot10^{-13}$", (18, -4))):
         ax.plot(HS[j], e[j], "o", color=col, ms=8, mec="white", zorder=7)
-        ax.annotate(txt, (HS[j], e[j]), textcoords="offset points", xytext=(-175, -22) if col == BLUE else (16, -34), fontsize=10, color=col)
-    ax.text(1e-4, 2e-1, "усечение, наклон 1", color=BLUE, fontsize=10.5, rotation=18)
-    ax.text(1e-2, 2e-6, "усечение, наклон 2", color=ORANGE, fontsize=10.5, rotation=34)
-    ax.text(1e-14, 3e-2, "округление, наклон $-1$", color=INK, fontsize=10.5, rotation=-20)
-    ax.set(title=r"U-кривая: ошибка разности для $\partial f/\partial x_1$ Розенброка в $(-1.2, 1)$", ylim=(1e-13, 1e3))
-    ax.legend(loc="upper center")
-    save("02_fd_ucurve.png")
+        ax.annotate(txt, (HS[j], e[j]), textcoords="offset points", xytext=xy, fontsize=10, color=col)
+    ax.text(1e-3, 3e-5, "наклон 2", color=ORANGE, fontsize=10.5, rotation=34)
+    ax.set(title=r"U-кривая: ошибка разности для $f=\sin x$ в $x=1$ по шагу $h$", ylim=(1e-14, 1e2))
+    ax.legend(loc="upper center", fontsize=9, ncol=2)
+    save("03_fd_ucurve.png")
 
 
-# ================================================================ 03 шумная функция
+# ================================================================ 04 шумная функция
 def fig_fd_noise(num):
     rng = np.random.default_rng(0)
-    noisy = lambda x: rosen(x) * (1 + 1e-10 * rng.standard_normal())
-    efn, ecn = ucurve(noisy, X0_ROSEN, 0, num["ex"])
-    assert 1e-7 < HS[np.argmin(efn)] < 1e-5 and 1e-4 < efn.min() < 1e-3, (HS[np.argmin(efn)], efn.min())
+    noisy = lambda x: np.sin(x[0]) * (1 + 1e-10 * rng.standard_normal())
+    efn, ecn = ucurve(noisy, X_SIN, 0, num["ex"])
+    assert 1e-6 < HS[np.argmin(efn)] < 1e-4 and 1e-8 < efn.min() < 1e-6, (HS[np.argmin(efn)], efn.min())
     fig, ax = plt.subplots(figsize=(9, 4.6))
     ucurve_axes(ax, HS, [num["ef"], num["ec"]], ["прямая, точная $f$", "центральная, точная $f$"], [BLUE, ORANGE], vlines=False)
     for e, lab, col in ((efn, "прямая, $f$ с шумом $10^{-10}$", BLUE), (ecn, "центральная, $f$ с шумом $10^{-10}$", ORANGE)):
         ax.loglog(HS, np.maximum(e, 1e-17), color=col, lw=1.8, alpha=0.4, label=lab)
         j = int(np.argmin(e)); ax.plot(HS[j], e[j], "o", color=col, ms=8, mec="white", alpha=0.7, zorder=7)
-    ax.annotate(f"$h=1.6\\cdot10^{{-6}}$, ошибка $4\\cdot10^{{-4}}$", (HS[np.argmin(efn)], efn.min()), textcoords="offset points", xytext=(14, 18), fontsize=10, color=BLUE)
-    ax.annotate(f"$h=1.3\\cdot10^{{-4}}$, ошибка $10^{{-6}}$", (HS[np.argmin(ecn)], ecn.min()), textcoords="offset points", xytext=(12, -18), fontsize=10, color=ORANGE)
-    ax.set(title="Шумная функция: левая ветка поднялась, дно уехало вправо", ylim=(1e-13, 1e3))
+    ax.annotate(f"$h={HS[np.argmin(efn)]:.1e}$, ошибка ${efn.min():.1e}$".replace("e-0", "\\cdot10^{-").replace("$, ", "}$, ").replace("e-1", "\\cdot10^{-1") + "}$" if False else
+                "$h=1.6\\cdot10^{-5}$, ошибка $1.4\\cdot10^{-7}$", (HS[np.argmin(efn)], efn.min()), textcoords="offset points", xytext=(14, 18), fontsize=10, color=BLUE)
+    ax.annotate("$h=8\\cdot10^{-4}$, ошибка $1.6\\cdot10^{-9}$", (HS[np.argmin(ecn)], ecn.min()), textcoords="offset points", xytext=(12, -18), fontsize=10, color=ORANGE)
+    ax.set(title="Шумная функция: левая ветка поднялась, дно уехало вправо", ylim=(1e-14, 1e2))
     ax.legend(loc="upper center", ncol=2, fontsize=10)
-    save("03_fd_noise.png")
+    save("04_fd_noise.png")
 
 
-# ================================================================ 04–05 граф вычислений
+# ================================================================ 05–06 граф вычислений
 NODES = {"x1": (0.0, 1.1), "x2": (0.0, -0.1), "v1": (1.8, 0.5), "v2": (3.6, 1.4), "f": (5.4, 0.5)}
 EDGES = [("x1", "v1"), ("x2", "v1"), ("v1", "v2"), ("v1", "f"), ("v2", "f")]
 EDGE_OFFSET = {("x1", "v1"): (0.0, 0.22), ("x2", "v1"): (0.0, -0.24), ("v1", "v2"): (-0.3, 0.22), ("v1", "f"): (0.0, -0.2), ("v2", "f"): (0.3, 0.22)}
@@ -319,7 +316,7 @@ def fig_graphs():
     ax.set_title(r"Прямой режим: $v_i$ и $\dot v_i$ текут слева направо, $d=(1,0)$")
     ax.text(2.7, -1.2, r"$\dot v_i=\sum_j \frac{\partial\varphi_i}{\partial v_j}\dot v_j$:  $\dot v_1=0.5\cdot1+2\cdot0$,  $\dot v_2=0.5403\cdot0.5$,  $\dot f=\dot v_1+\dot v_2=\partial f/\partial x_1$",
             fontsize=10.5, ha="center", color=BLUE)
-    save("04_graph_forward.png")
+    save("05_graph_forward.png")
 
     fig, ax = plt.subplots(figsize=(9, 4.6))
     bottom = {"x1": f"$\\bar x_1={t['bx1']:.4f}$", "x2": f"$\\bar x_2={t['bx2']:.4f}$", "v1": f"$\\bar v_1=1+0.5403$", "v2": r"$\bar v_2=1$", "f": r"$\bar f=1$"}
@@ -327,10 +324,10 @@ def fig_graphs():
     ax.set_title(r"Обратный режим: $\bar v_i=\partial f/\partial v_i$ текут от $f$ к входам — один проход")
     ax.text(2.7, -1.2, r"$\bar v_j\ {+}{=}\ \bar v_i\,\partial\varphi_i/\partial v_j$:  $\bar v_1=1+1\cdot0.5403=1.5403$,  $\nabla f=(\bar v_1 x_2,\ \bar v_1 x_1)=(0.7702,\ 3.0806)$",
             fontsize=10.5, ha="center", color=VIOLET)
-    save("05_graph_reverse.png")
+    save("06_graph_reverse.png")
 
 
-# ================================================================ 06 цена
+# ================================================================ 07 цена
 def fig_cost(num):
     ns = np.array([80, 400, 2000])
     c = num["costs"]
@@ -360,10 +357,10 @@ def fig_cost(num):
     for b, val in zip(bars, (t_fd * 1e3, t_ad * 1e3)):
         ax.text(b.get_x() + b.get_width() / 2, val * 1.3, f"{val:.2f} мс" if val < 1 else f"{val:.0f} мс", ha="center", fontsize=11)
     ax.grid(False, axis="x")
-    save("06_cost.png")
+    save("07_cost.png")
 
 
-# ================================================================ 07 разреженность
+# ================================================================ 08 разреженность
 def fig_sparsity():
     energy, grad, _ = make_elastic_chain(40)
     pattern, v0, Hfun = chain_pattern(40)                              # в равновесии цепи: все ленты заполнены
@@ -386,14 +383,14 @@ def fig_sparsity():
     pc = ax.pcolormesh(np.maximum(np.abs(Hff), 1e-12), cmap="Greys", norm=LogNorm(vmin=1e-12, vmax=1e3))
     ax.invert_yaxis(); ax.set(aspect="equal", title=f"разности по $E$: шум до $3\\cdot10^{{-5}}$, «ненулевых» {nnz_fd}", xticks=[0, 40, 80], yticks=[0, 40, 80]); ax.grid(False)
     cb = fig.colorbar(pc, ax=ax, fraction=0.046, pad=0.03); cb.set_label(r"$|\nabla^2E_{ij}|$")
-    save("07_sparsity.png")
+    save("08_sparsity.png")
 
 
 if __name__ == "__main__":
     num = numbers()
     print("числа проверены; рисую")
-    fig_hooks(num)
     fig_review()
+    fig_secants()
     fig_fd_ucurve(num)
     fig_fd_noise(num)
     fig_graphs()
