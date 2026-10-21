@@ -14,7 +14,7 @@
   05_graph_forward    граф вычислений f = x1 x2 + sin(x1 x2): значения и производные по направлению d = (1, 0)
   06_graph_reverse    тот же граф назад: сопряжённые величины и градиент за один проход
   07_cost             цена градиента и гессиана цепи в единицах цены энергии от n; время при n = 2000
-  08_sparsity         гессиан цепи 80x80: портрет ненулевых из CasADi и разностный гессиан с шумом
+  08_sparsity         гессиан цепи 80x80: портрет ненулевых из CasADi и гессиан как разность разностного градиента
 """
 
 import time
@@ -365,15 +365,13 @@ def fig_sparsity():
     energy, grad, _ = make_elastic_chain(40)
     pattern, v0, Hfun = chain_pattern(40)                              # в равновесии цепи: все ленты заполнены
     H = np.array(Hfun(v0))
-    n, hh = 80, 1e-4
-    Hff = np.zeros((n, n)); I = np.eye(n)
-    for i in range(n):
-        for j in range(n):
-            ei, ej = I[i], I[j]
-            Hff[i, j] = (energy(v0 + hh * (ei + ej)) - energy(v0 + hh * (ei - ej)) - energy(v0 - hh * (ei - ej)) + energy(v0 - hh * (ei + ej))) / (4 * hh * hh)
+    n, h1, h2 = 80, np.sqrt(EPS), 1e-4                                 # разность разностного градиента: как SciPy без jac и hess
+    g_fd = lambda v: np.array([fd_forward(energy, v, i, h1) for i in range(n)])
+    g0 = g_fd(v0)
+    Hff = np.array([(g_fd(v0 + h2 * e) - g0) / h2 for e in np.eye(n)]).T
     err = np.abs(Hff - H).max()
     nnz_ca, nnz_fd = int(pattern.sum()), int(np.sum(np.abs(Hff) > 1e-12))
-    assert nnz_ca == 472 and int(np.sum(np.abs(H) > 1e-12)) >= 460 and 1e-5 < err < 1e-3 and nnz_fd > 1000, (nnz_ca, err, nnz_fd)   # средняя пружина горизонтальна: 4 элемента y–z численно нулевые
+    assert nnz_ca == 472 and int(np.sum(np.abs(H) > 1e-12)) >= 460 and 5e-3 < err < 1e-1 and nnz_fd > 1000, (nnz_ca, err, nnz_fd)   # средняя пружина горизонтальна: 4 элемента y–z численно нулевые
     fig, axs = plt.subplots(1, 2, figsize=(9, 4.4))
     ax = axs[0]
     ax.spy(pattern, markersize=2.2, color=INK)
@@ -381,7 +379,7 @@ def fig_sparsity():
     ax.text(40, 86, "блоки: $y$–$y$, $y$–$z$, $z$–$y$, $z$–$z$ — по пружине на соседей", ha="center", fontsize=10, color=GRAY)
     ax = axs[1]
     pc = ax.pcolormesh(np.maximum(np.abs(Hff), 1e-12), cmap="Greys", norm=LogNorm(vmin=1e-12, vmax=1e3))
-    ax.invert_yaxis(); ax.set(aspect="equal", title=f"разности по $E$: шум до $3\\cdot10^{{-5}}$, «ненулевых» {nnz_fd}", xticks=[0, 40, 80], yticks=[0, 40, 80]); ax.grid(False)
+    ax.invert_yaxis(); ax.set(aspect="equal", title=f"разность разностей:\nошибка до {err:.0e}, «ненулевых» {nnz_fd}", xticks=[0, 40, 80], yticks=[0, 40, 80]); ax.grid(False)
     cb = fig.colorbar(pc, ax=ax, fraction=0.046, pad=0.03); cb.set_label(r"$|\nabla^2E_{ij}|$")
     save("08_sparsity.png")
 
