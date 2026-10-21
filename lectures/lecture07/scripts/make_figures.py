@@ -313,7 +313,7 @@ def fig_graphs():
     fig, ax = plt.subplots(figsize=(9, 4.6))
     bottom = {"x1": r"$\dot x_1=1$", "x2": r"$\dot x_2=0$", "v1": r"$\dot v_1=0.5$", "v2": f"$\\dot v_2={t['dv2']:.4f}$", "f": f"$\\dot f={t['df']:.4f}$"}
     draw_graph(ax, top, bottom, labels)
-    ax.set_title(r"Прямой режим: $v_i$ и $\dot v_i$ текут слева направо, $d=(1,0)$")
+    ax.set_title(r"Прямой режим, проход по $x_1$: $v_i$ и $\dot v_i=\partial v_i/\partial x_1$ текут слева направо")
     ax.text(2.7, -1.2, r"$\dot v_i=\sum_j \frac{\partial\varphi_i}{\partial v_j}\dot v_j$:  $\dot v_1=0.5\cdot1+2\cdot0$,  $\dot v_2=0.5403\cdot0.5$,  $\dot f=\dot v_1+\dot v_2=\partial f/\partial x_1$",
             fontsize=10.5, ha="center", color=BLUE)
     save("05_graph_forward.png")

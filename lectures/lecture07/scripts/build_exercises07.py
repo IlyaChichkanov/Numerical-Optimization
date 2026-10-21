@@ -122,7 +122,7 @@ md(r"""## 7.2. Прямой режим руками
 
 code(r'''PROGRAM2 = [("v1", "exp", ("x1",)), ("v2", "mul", ("v1", "x2")), ("v3", "sq", ("x1",)), ("f", "add", ("v2", "v3"))]
 val, dot = forward_mode(PROGRAM2, {"x1": 0.0, "x2": 1.0}, {"x1": 1.0, "x2": 1.0})
-print("7.2 значения:", {k: round(v, 4) for k, v in val.items()}, " прямой режим:", {k: round(v, 4) for k, v in dot.items()})
+print("7.2 значения:", {k: round(float(v), 4) for k, v in val.items()}, " прямой режим:", {k: round(float(v), 4) for k, v in dot.items()})
 assert dot["f"] == 2.0''')
 
 # ---------------------------------------------------------------- 7.3
@@ -135,7 +135,7 @@ md(r"""## 7.3. Обратный режим руками
 **(б)** В $(1,\pi)$: $v_1=\pi$, $\bar v_2=1$, $\bar v_1=1+\cos\pi=0$, $\nabla f=(\bar v_1x_2,\ \bar v_1x_1)=(0,0)$ — стационарная точка: на кривой $x_1x_2=\pi$ производная $f$ по $v_1$ обращается в ноль.""")
 
 code(r'''val, bar = reverse_mode(PROGRAM2, {"x1": 0.0, "x2": 1.0})
-print("7.3(а) обратный режим:", {k: round(v, 4) for k, v in bar.items()})
+print("7.3(а) обратный режим:", {k: round(float(v), 4) for k, v in bar.items()})
 x2 = ca.SX.sym("x", 2)
 for name, prog, expr, pt in (("7.3(а)", PROGRAM2, ca.exp(x2[0]) * x2[1] + x2[0] ** 2, [0.0, 1.0]),
                              ("7.3(б)", PROGRAM, x2[0] * x2[1] + ca.sin(x2[0] * x2[1]), [1.0, np.pi])):
