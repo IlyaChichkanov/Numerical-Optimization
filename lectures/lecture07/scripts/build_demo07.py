@@ -271,7 +271,7 @@ md(r"""## Шпаргалка
 | центральная разность | $\dfrac{f(x+he_i)-f(x-he_i)}{2h}$, $h^\ast\sim\varepsilon^{1/3}$, ошибка $\sim\varepsilon^{2/3}$ | §2.2 |
 | прямой режим | $\dot v_i=\sum_j\frac{\partial\varphi_i}{\partial v_j}\dot v_j$, на выходе $\nabla f^\top d$ | §3.2 |
 | обратный режим | $\bar v_j\mathrel{+}=\bar v_i\,\partial\varphi_i/\partial v_j$, на выходе $\bar x=\nabla f$ | §4.2 |
-| цена | вперёд $\le2.5$ цены $f$ на направление; назад $\le4$ на весь градиент | §3.4, §4.3 |
+| цена | вперёд $\le2.5$ цены $f$ на направление; назад $\le4$ на весь градиент | §3.3, §4.2 |
 | CasADi | `gradient` — назад, `jtimes` — вперёд, `hessian` — назад по прямому, `n_instructions()` — цена | §5 |
 
 **Три вещи, которые легко перепутать.**
