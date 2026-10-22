@@ -333,7 +333,6 @@ def fig_cost(num):
     c = num["costs"]
     grad_ad = np.array([c[N][1] / c[N][0] for N in (40, 200, 1000)])
     hess_ad = np.array([c[N][2] / c[N][0] for N in (40, 200, 1000)])
-    hd_ad = np.array([c[N][3] / c[N][0] for N in (40, 200, 1000)])
     # время при n = 2000
     energy, grad, v0 = make_elastic_chain(1000)
     v, E = chain_casadi(1000); G = ca.Function("G", [v], [ca.gradient(E, v)])
@@ -343,16 +342,16 @@ def fig_cost(num):
     fig, axs = plt.subplots(1, 2, figsize=(9, 4), gridspec_kw=dict(width_ratios=[1.5, 1]))
     ax = axs[0]
     nn = np.geomspace(50, 4000, 50)
-    ax.loglog(nn, nn + 1, color=ORANGE, lw=1.8, label="градиент разностями: $n+1$ вычислений $f$")
+    ax.loglog(nn, nn + 1, color=ORANGE, lw=1.8, label="градиент разностями: $n+1$ вычислений $E$")
     ax.loglog(ns, ns + 1, "o", color=ORANGE, ms=7)
-    for y, col, lab, mk in ((hess_ad, RED, "гессиан, CasADi", "s"), (hd_ad, AQUA, r"$\nabla^2 f\,d$, CasADi", "D"), (grad_ad, BLUE, "градиент, обратный режим", "o")):
+    for y, col, lab, mk in ((hess_ad, RED, "гессиан (CasADi)", "s"), (grad_ad, BLUE, "градиент обратным режимом (CasADi)", "o")):
         ax.loglog(ns, y, "-" + mk, color=col, ms=7, lw=1.8, label=f"{lab}: {y.mean():.1f}")
     for n_, g_ in zip(ns, ns + 1):
         ax.annotate(str(g_), (n_, g_), textcoords="offset points", xytext=(8, -4), fontsize=10, color=ORANGE)
-    ax.set(xlabel="переменных $n$", ylabel="цена, в операциях $f$", title="Упругая цепь: цена производных от $n$", ylim=(1, 1e5), xticks=[80, 400, 2000], xticklabels=["80", "400", "2000"])
+    ax.set(xlabel="переменных $n$", ylabel="цена, в операциях $E$", title="Упругая цепь: цена градиента и гессиана от $n$", ylim=(1, 1e5), xticks=[80, 400, 2000], xticklabels=["80", "400", "2000"])
     ax.legend(loc="upper left", fontsize=9.5)
     ax = axs[1]
-    bars = ax.bar(["разности", "CasADi"], [t_fd * 1e3, t_ad * 1e3], color=[ORANGE, BLUE], width=0.55)
+    bars = ax.bar(["разности", "обратный режим\n(CasADi)"], [t_fd * 1e3, t_ad * 1e3], color=[ORANGE, BLUE], width=0.55)
     ax.set_yscale("log"); ax.set(ylabel="мс на один градиент", title="$n=2000$: время градиента", ylim=(0.05, 2000))
     for b, val in zip(bars, (t_fd * 1e3, t_ad * 1e3)):
         ax.text(b.get_x() + b.get_width() / 2, val * 1.3, f"{val:.2f} мс" if val < 1 else f"{val:.0f} мс", ha="center", fontsize=11)
