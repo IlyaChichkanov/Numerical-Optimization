@@ -80,13 +80,19 @@ from l8helpers import *  # окружность, клюв, цепь на сте�
 # ---------------------------------------------------------------- 8.0
 md(r"""## 8.0. Разминка — счёт руками
 
-**(а) Ближайшая точка плоскости.** $L=\tfrac12\lVert x-x_0\rVert^2-\lambda(a^\top x-b)$. Из $\nabla_xL=x-x_0-\lambda a=0$ получаем $x=x_0+\lambda a$; подставляем в $a^\top x=b$: $a^\top x_0+\lambda\lVert a\rVert^2=b$, откуда
+**(а) Ближайшая точка плоскости.** Функция Лагранжа:
 
 $$
-\lambda=\frac{b-a^\top x_0}{\lVert a\rVert^2},\qquad x^\ast=x_0+\frac{b-a^\top x_0}{\lVert a\rVert^2}\,a
+L=\tfrac12\lVert x-x_0\rVert^2-\lambda\,(q^\top x-d) .
 $$
 
-— формула проекции на плоскость из лекции 2. Множитель — подписанное расстояние до плоскости в единицах $\lVert a\rVert$: $\lambda\lVert a\rVert=(b-a^\top x_0)/\lVert a\rVert$. Второй порядок: $\nabla^2_{xx}L=I\succ0$, минимум.
+Из $\nabla_xL=x-x_0-\lambda q=0$ получаем $x=x_0+\lambda q$. Подставим в $q^\top x=d$: $q^\top x_0+\lambda\lVert q\rVert^2=d$. Отсюда
+
+$$
+\lambda=\frac{d-q^\top x_0}{\lVert q\rVert^2},\qquad x^\ast=x_0+\frac{d-q^\top x_0}{\lVert q\rVert^2}\,q .
+$$
+
+Это формула проекции на плоскость из лекции 2. Множитель — расстояние до плоскости со знаком, в единицах $\lVert q\rVert$. Второй порядок: $\nabla^2_{xx}L=I\succ0$, минимум.
 
 **(б) $\min x_1+x_2$ на окружности.** $g=x_1^2+x_2^2-1$, $\nabla f=(1,1)=\lambda(2x_1,2x_2)$, значит $x_1=x_2=1/(2\lambda)$; из $g=0$: $2/(4\lambda^2)=1$, $\lambda=\pm1/\sqrt2$. Два решения: $x=(1,1)/\sqrt2$ с $\lambda=1/\sqrt2$ и $x=-(1,1)/\sqrt2$ с $\lambda=-1/\sqrt2$. Минимум — второе, $f=-\sqrt2$: там $\nabla^2_{xx}L=\nabla^2f-\lambda\nabla^2g=0+\tfrac{1}{\sqrt2}\cdot2I=\sqrt2\,I\succ0$; в первом $-\sqrt2\,I$ — максимум.
 
@@ -148,7 +154,10 @@ ax.set_xlabel("$x_1$"); ax.legend(); plt.show()''')
 # ---------------------------------------------------------------- 8.3
 md(r"""## 8.3. Кривизна ограничения
 
-**(а)** Параметризация $x(t)=(t,ct^2)$, $\varphi(t)=ct^2$, $\varphi''(0)=2c$; то же из $Z^\top\nabla^2_{xx}LZ$ с $Z=(1,0)^\top$ и $\nabla^2_{xx}L=\operatorname{diag}(2c,0)$. При $c>0$ — строгий минимум, при $c<0$ — строгий максимум. При $c=0$ ограничение — прямая $x_2=0$, на ней $f\equiv0$: каждая точка одновременно нестрогий минимум и нестрогий максимум; необходимое условие $2c\ge0$ выполнено, достаточное $2c>0$ — нет. Это и есть «ни то ни другое»: теорема молчит, и ответ зависит от членов выше второго порядка (здесь их нет).
+**(а)** Точка параболы $x(t)=(t,\ ct^2)$, тогда $f(x(t))=ct^2$ и вторая производная равна $2c$. То же даёт $Z^\top\nabla^2_{xx}L\,Z$ с $Z=(1,0)^\top$ и $\nabla^2_{xx}L=\operatorname{diag}(2c,0)$.
+
+- $c>0$ — строгий минимум, $c<0$ — строгий максимум.
+- $c=0$: ограничение — прямая $x_2=0$, на ней $f\equiv0$. Каждая точка — нестрогий минимум и нестрогий максимум сразу. Необходимое условие $2c\ge0$ выполнено, достаточное $2c>0$ — нет. Теорема молчит.
 
 **(б)** $f=x_1^2-x_2^2$, $g=x_2$: $\nabla f(0,0)=0$, значит $\lambda=0$ и $\nabla^2_{xx}L=\nabla^2f=\operatorname{diag}(2,-2)$ — индефинитна. Но $J=(0,1)$, $Z=(1,0)^\top$, редуцированный гессиан $Z^\top\operatorname{diag}(2,-2)Z=2>0$: строгий минимум. На прямой $x_2=0$ функция равна $x_1^2$, отрицательное направление кривизны $(0,1)$ запрещено ограничением.""")
 
@@ -171,15 +180,15 @@ for k in (1.01, 1.05):
     pred = f0 + lam.sum() * (ch2["ell"] ** 2 - ch["ell"] ** 2)             # первый порядок по множителям
     print(f"+{(k - 1) * 100:.0f} %: f* = {f2:.3f}, по множителям {pred:.3f}, расхождение {f2 - pred:.3f}")''')
 
-code(r'''Ls = np.linspace(4.8, 5.5, 15); fL = []
-for L in Ls:
-    chL = rod_chain(L_total=L); vL, _, _ = solve_rod_chain(chL, v0=v)
-    fL.append(chL["w"] * chain_xy(chL, vL)[1][1:-1].sum())
+code(r'''lengths = np.linspace(4.8, 5.5, 15); f_len = []                         # общая длина цепи, м
+for total in lengths:
+    chL = rod_chain(L_total=total); vL, _, _ = solve_rod_chain(chL, v0=v)
+    f_len.append(chL["w"] * chain_xy(chL, vL)[1][1:-1].sum())
 slope = lam.sum() * 2 * ch["ell"] / (ch["N"] + 1)                        # d f*/dL = sum lam_j d(ell^2)/dL
 fig, ax = plt.subplots(figsize=(6, 3.6))
-ax.plot(Ls, fL, "o-", color=BLUE, ms=4, label="$f^*(L)$ — пересчёт")
-ax.plot(Ls, f0 + slope * (Ls - 5), "--", color=ORANGE, label=f"касательная по множителям, наклон {slope:.1f} Дж/м")
-ax.set_xlabel("общая длина $L$, м"); ax.set_ylabel("$f^*$, Дж"); ax.legend(fontsize=9); plt.show()''')
+ax.plot(lengths, f_len, "o-", color=BLUE, ms=4, label="$f^*$ — пересчёт IPOPT")
+ax.plot(lengths, f0 + slope * (lengths - 5), "--", color=ORANGE, label=f"касательная по множителям, наклон {slope:.1f} Дж/м")
+ax.set_xlabel("общая длина цепи, м"); ax.set_ylabel("$f^*$, Дж"); ax.legend(fontsize=9); plt.show()''')
 
 # ---------------------------------------------------------------- 8.5
 md(r"""## 8.5. Цена доходности
@@ -203,15 +212,15 @@ md(r"""## 8.6. Для желающих: доказательства
 
 **Теорема первого порядка (§3.2).** Пусть $x^\ast$ — локальный минимум $f$ при $g(x)=0$, $g:\mathbb R^n\to\mathbb R^m$ непрерывно дифференцируема, $\operatorname{rank}J(x^\ast)=m$. Переставим координаты так, что $x=(u,s)$, $u\in\mathbb R^{n-m}$, $s\in\mathbb R^m$, и квадратный блок $\partial g/\partial s$ невырожден в $x^\ast$ (это и есть LICQ: среди $n$ столбцов $J$ есть $m$ независимых). По теореме о неявной функции около $x^\ast$ уравнение $g(u,s)=0$ однозначно разрешимо: $s=\sigma(u)$, $\sigma$ непрерывно дифференцируема, $\sigma(u^\ast)=s^\ast$. Положим $\psi(u)=(u,\sigma(u))$ — параметризация поверхности. Дифференцируя $g(\psi(u))\equiv0$, получаем $J\,\psi'(u)=0$: столбцы $\psi'(u^\ast)$ ($n-m$ штук, независимые — в верхней части стоит единичная матрица) лежат в $\ker J$, а размерность $\ker J$ равна $n-m$, так что это базис, $Z=\psi'(u^\ast)$.
 
-Функция $\varphi(u)=f(\psi(u))$ имеет в $u^\ast$ локальный минимум без ограничений, поэтому $\nabla\varphi(u^\ast)=Z^\top\nabla f(x^\ast)=0$: вектор $\nabla f(x^\ast)$ ортогонален $\ker J$. Ортогональное дополнение ядра — пространство строк: $\nabla f(x^\ast)=J^\top\lambda$ для некоторого $\lambda$, и он единственный, так как строки $J$ независимы.
+Функция $\tilde f(u)=f(\psi(u))$ имеет в $u^\ast$ локальный минимум без ограничений, поэтому $\nabla\tilde f(u^\ast)=Z^\top\nabla f(x^\ast)=0$: вектор $\nabla f(x^\ast)$ ортогонален $\ker J$. Ортогональное дополнение ядра — пространство строк: $\nabla f(x^\ast)=J^\top\lambda$ для некоторого $\lambda$, и он единственный, так как строки $J$ независимы.
 
-**Теорема второго порядка (§4.2).** В той же параметризации $\nabla^2\varphi(u^\ast)=Z^\top\nabla^2f\,Z+\sum_k\partial_kf\,\nabla^2\psi_k$. Второй член содержит кривизну параметризации; избавимся от него, продифференцировав дважды $g_j(\psi(u))\equiv0$: $Z^\top\nabla^2g_j\,Z+\sum_k\partial_kg_j\,\nabla^2\psi_k=0$. Умножим на $\lambda_j$, сложим и используем $\nabla f=\sum_j\lambda_j\nabla g_j$:
+**Теорема второго порядка (§4.2).** В той же параметризации $\nabla^2\tilde f(u^\ast)=Z^\top\nabla^2f\,Z+\sum_k\partial_kf\,\nabla^2\psi_k$. Второй член содержит кривизну параметризации; избавимся от него, продифференцировав дважды $g_j(\psi(u))\equiv0$: $Z^\top\nabla^2g_j\,Z+\sum_k\partial_kg_j\,\nabla^2\psi_k=0$. Умножим на $\lambda_j$, сложим и используем $\nabla f=\sum_j\lambda_j\nabla g_j$:
 
 $$
-\nabla^2\varphi(u^\ast)=Z^\top\Big(\nabla^2f-\sum_j\lambda_j\nabla^2g_j\Big)Z=Z^\top\nabla^2_{xx}L\,Z .
+\nabla^2\tilde f(u^\ast)=Z^\top\Big(\nabla^2f-\sum_j\lambda_j\nabla^2g_j\Big)Z=Z^\top\nabla^2_{xx}L\,Z .
 $$
 
-Для задачи без ограничений (лекция 4): $\nabla^2\varphi(u^\ast)\succeq0$ необходимо, $\succ0$ достаточно для строгого минимума; $u^\ast$ — строгий минимум $\varphi$ тогда и только тогда, когда $x^\ast$ — строгий минимум $f$ на поверхности, потому что $\psi$ — взаимно однозначное гладкое соответствие между окрестностью $u^\ast$ и куском поверхности.
+Для задачи без ограничений (лекция 4): $\nabla^2\tilde f(u^\ast)\succeq0$ необходимо, $\succ0$ достаточно для строгого минимума; $u^\ast$ — строгий минимум $\tilde f$ тогда и только тогда, когда $x^\ast$ — строгий минимум $f$ на поверхности, потому что $\psi$ — взаимно однозначное гладкое соответствие между окрестностью $u^\ast$ и куском поверхности.
 
 **Формула чувствительности (§5.2).** Семейство задач $g(x)=b$. Система $F(x,\lambda,b)=(\nabla f(x)-J(x)^\top\lambda,\ g(x)-b)=0$ имеет в $(x^\ast,\lambda^\ast,b_0)$ матрицу Якоби по $(x,\lambda)$
 
@@ -225,7 +234,7 @@ MD_TEXT = r"""# Упражнения к лекции 8 — краткие отв
 
 Разбор с проверкой кодом — [`exercises08.ipynb`](exercises08.ipynb). Условия — раздел 9 [конспекта](lecture08.md).
 
-**8.0.** (а) $\lambda=(b-a^\top x_0)/\lVert a\rVert^2$, $x^\ast=x_0+\lambda a$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
+**8.0.** (а) $\lambda=(d-q^\top x_0)/\lVert q\rVert^2$, $x^\ast=x_0+\lambda q$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
 
 **8.1.** (а) $x=\pm a/\sqrt5$, $\lambda=1\mp\sqrt5$. (б) $Z=(-x_2,x_1)^\top$, редуцированный гессиан $1-\lambda=\pm\sqrt5$: минимум и максимум. При $a=(0.3,0.1)$ в минимуме $\lambda=0.684>0$ — знак $\lambda$ сменился, редуцированный гессиан $\pm0.316$ по-прежнему различает точки.
 
@@ -237,7 +246,7 @@ MD_TEXT = r"""# Упражнения к лекции 8 — краткие отв
 
 **8.5.** Система линейна ($f$ квадратична, ограничения линейны). $\partial f^\ast/\partial\rho=\lambda_\rho$ с точностью $10^{-10}$; $x_1<0$ при $\rho>10.64\,\%$, тогда в задаче Л3 активно $x_1\ge0$ и $\lambda_\rho=0.47$ при $12\,\%$ вместо $0.35$ с шортами.
 
-**8.6.** Параметризация $\psi(u)=(u,\sigma(u))$ по теореме о неявной функции (LICQ — невырожденность блока $\partial g/\partial s$), $Z=\psi'(u^\ast)$ — базис $\ker J$; $\nabla\varphi=Z^\top\nabla f=0$ даёт $\nabla f\in\operatorname{range}J^\top$; $\nabla^2\varphi=Z^\top\nabla^2_{xx}LZ$ после исключения $\nabla^2\psi$ через $g\circ\psi\equiv0$. Чувствительность: $x^\ast(b)$, $\lambda^\ast(b)$ дифференцируемы, если матрица ККТ невырождена — LICQ плюс достаточное условие второго порядка.
+**8.6.** Параметризация $\psi(u)=(u,\sigma(u))$ по теореме о неявной функции (LICQ — невырожденность блока $\partial g/\partial s$), $Z=\psi'(u^\ast)$ — базис $\ker J$; $\nabla\tilde f=Z^\top\nabla f=0$ даёт $\nabla f\in\operatorname{range}J^\top$; $\nabla^2\tilde f=Z^\top\nabla^2_{xx}LZ$ после исключения $\nabla^2\psi$ через $g\circ\psi\equiv0$. Чувствительность: $x^\ast(b)$, $\lambda^\ast(b)$ дифференцируемы, если матрица ККТ невырождена — LICQ плюс достаточное условие второго порядка.
 """
 
 

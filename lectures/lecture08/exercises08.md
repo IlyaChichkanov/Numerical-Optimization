@@ -2,7 +2,7 @@
 
 Разбор с проверкой кодом — [`exercises08.ipynb`](exercises08.ipynb). Условия — раздел 9 [конспекта](lecture08.md).
 
-**8.0.** (а) $\lambda=(b-a^\top x_0)/\lVert a\rVert^2$, $x^\ast=x_0+\lambda a$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
+**8.0.** (а) $\lambda=(d-q^\top x_0)/\lVert q\rVert^2$, $x^\ast=x_0+\lambda q$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
 
 **8.1.** (а) $x=\pm a/\sqrt5$, $\lambda=1\mp\sqrt5$. (б) $Z=(-x_2,x_1)^\top$, редуцированный гессиан $1-\lambda=\pm\sqrt5$: минимум и максимум. При $a=(0.3,0.1)$ в минимуме $\lambda=0.684>0$ — знак $\lambda$ сменился, редуцированный гессиан $\pm0.316$ по-прежнему различает точки.
 
@@ -14,4 +14,4 @@
 
 **8.5.** Система линейна ($f$ квадратична, ограничения линейны). $\partial f^\ast/\partial\rho=\lambda_\rho$ с точностью $10^{-10}$; $x_1<0$ при $\rho>10.64\,\%$, тогда в задаче Л3 активно $x_1\ge0$ и $\lambda_\rho=0.47$ при $12\,\%$ вместо $0.35$ с шортами.
 
-**8.6.** Параметризация $\psi(u)=(u,\sigma(u))$ по теореме о неявной функции (LICQ — невырожденность блока $\partial g/\partial s$), $Z=\psi'(u^\ast)$ — базис $\ker J$; $\nabla\varphi=Z^\top\nabla f=0$ даёт $\nabla f\in\operatorname{range}J^\top$; $\nabla^2\varphi=Z^\top\nabla^2_{xx}LZ$ после исключения $\nabla^2\psi$ через $g\circ\psi\equiv0$. Чувствительность: $x^\ast(b)$, $\lambda^\ast(b)$ дифференцируемы, если матрица ККТ невырождена — LICQ плюс достаточное условие второго порядка.
+**8.6.** Параметризация $\psi(u)=(u,\sigma(u))$ по теореме о неявной функции (LICQ — невырожденность блока $\partial g/\partial s$), $Z=\psi'(u^\ast)$ — базис $\ker J$; $\nabla\tilde f=Z^\top\nabla f=0$ даёт $\nabla f\in\operatorname{range}J^\top$; $\nabla^2\tilde f=Z^\top\nabla^2_{xx}LZ$ после исключения $\nabla^2\psi$ через $g\circ\psi\equiv0$. Чувствительность: $x^\ast(b)$, $\lambda^\ast(b)$ дифференцируемы, если матрица ККТ невырождена — LICQ плюс достаточное условие второго порядка.

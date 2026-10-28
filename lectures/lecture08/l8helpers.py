@@ -1,6 +1,7 @@
 """Вспомогательный код демонстраций лекции 8.
 
 Окружность: A_CIRCLE, circle_system(z) — система условий первого порядка, circle_points() -> ((x, lam) ближней, дальней).
+Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.
 Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).
 Цепь на стержнях: rod_chain(N, L_total) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)
         в нашем знаке L = f - lam^T g; chain_xy(ch, v) -> (y, z) с опорами; chain_checks(ch, v, lam) -> невязка, rank J,
@@ -41,6 +42,19 @@ def circle_points(a=A_CIRCLE):
     """Оба решения системы: (x, lam) ближней и дальней точки."""
     na = np.linalg.norm(a)
     return (a / na, 1 - na), (-a / na, 1 + na)
+
+
+A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружность в пространстве, точка a поднята над плоскостью
+
+
+def sphere_plane(a=A_SPACE):
+    """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
+    Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
+    xs = np.r_[a[:2] / np.linalg.norm(a[:2]), 0.0]
+    gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
+    J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
+    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
+    return xs, gf, J, lam, null_space(J)
 
 
 def cusp_grad(x1):
