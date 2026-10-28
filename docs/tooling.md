@@ -49,6 +49,8 @@ uv run python lectures/lecture01/build_exercises01.py     # exercises01.ipynb (�
 uv run jupyter nbconvert --to notebook --execute --inplace lectures/lecture01/demo01.ipynb lectures/lecture01/exercises01.ipynb
 uv run python homeworks/solutions/build_hw01.py                # hw01.ipynb (шаблон) + solutions/hw01_solution.ipynb
 uv run jupyter nbconvert --to notebook --execute --inplace homeworks/solutions/hw01_solution.ipynb
+uv run python homeworks/solutions/build_hw03.py                # hw03.ipynb (шаблон) + solutions/hw03_solution.ipynb
+uv run jupyter nbconvert --to notebook --execute --inplace homeworks/solutions/hw03_solution.ipynb
 ```
 
 Начиная с лекции 4 конспект-ноутбук содержит и код демонстраций, поэтому собирается не `md2nb.py`, а своим скриптом, и после сборки выполняется:
