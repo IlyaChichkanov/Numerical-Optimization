@@ -24,7 +24,8 @@
 | 5 | 07.10 | Метод Ньютона, квази-ньютоновские методы (BFGS, L-BFGS), Гаусс–Ньютон, локальная сходимость | [конспект](lectures/lecture05/lecture05.md) · [конспект-ноутбук с демо](lectures/lecture05/lecture05.ipynb) · [демо-ноутбук](lectures/lecture05/demo05.ipynb) · [семинар](lectures/lecture05/seminar05.ipynb) · [разбор упражнений](lectures/lecture05/exercises05.ipynb) · [ДЗ 3](homeworks/hw03.md) (до 21.10) |
 | 6 | 14.10 | Глобализация: линейный поиск (Армихо, Вольфе), доверительная область | [конспект](lectures/lecture06/lecture06.md) · [конспект-ноутбук с демо](lectures/lecture06/lecture06.ipynb) · [демо-ноутбук](lectures/lecture06/demo06.ipynb) · [семинар (CasADi, IPOPT)](lectures/lecture06/seminar06.ipynb) · [разбор упражнений](lectures/lecture06/exercises06.ipynb) |
 | 7 | 21.10 | Вычисление производных: конечные разности, алгоритмическое дифференцирование вперёд и назад, CasADi | [конспект](lectures/lecture07/lecture07.md) · [конспект-ноутбук с демо](lectures/lecture07/lecture07.ipynb) · [демо-ноутбук](lectures/lecture07/demo07.ipynb) · [разбор упражнений](lectures/lecture07/exercises07.ipynb) |
-| 8–16 | 28.10 – 23.12 | см. [календарь в программе курса](syllabus.md#3-календарь) | появляются еженедельно |
+| 8 | 04.11 | Ограничения-равенства: множители Лагранжа, LICQ, условия второго порядка | [конспект](lectures/lecture08/lecture08.md) · [конспект-ноутбук с демо](lectures/lecture08/lecture08.ipynb) · [демо-ноутбук](lectures/lecture08/demo08.ipynb) · [разбор упражнений](lectures/lecture08/exercises08.ipynb) |
+| 9–16 | — | см. [календарь в программе курса](syllabus.md#3-календарь) | появляются еженедельно |
 
 [Программа курса](syllabus.md): цели, календарь, домашние задания, проект, оценивание, литература.
 
