@@ -2,20 +2,22 @@
 
 Запуск:  uv run --group casadi python lectures/lecture08/scripts/make_figures.py
 
-Скрипт самодостаточен: окружность, клюв, параболы, цепь на стержнях и портфель определены здесь тем же
-кодом, что в build_demo08.py / l8helpers.py; числа конспекта считаются в скрипте и проверяются ассертами.
-Цепь на стержнях и её множители — через CasADi + IPOPT.
+Скрипт самодостаточен: окружность, окружность в пространстве, клюв, параболы, цепь на стержнях и портфель
+определены здесь тем же кодом, что в build_demo08.py / l8helpers.py; числа конспекта считаются в скрипте и
+проверяются ассертами. Цепь на стержнях и её множители — через CasADi + IPOPT.
 
 Картинки в порядке появления в конспекте:
-  01_review               касание (Л3): линия уровня f = 1/2|x - a|^2 касается окружности; рядом точка без касания
-  02_circle_two_points    две точки Лагранжа на окружности: lambda = 1 - sqrt5 (минимум) и 1 + sqrt5 (максимум)
-  03_tangent_space        разложение grad f на нормальную часть lambda grad g и касательную часть; в оптимуме касательной нет
-  04_cusp_licq            клюв x2 = x1^(2/3): grad g -> 0, угол между grad f и grad g -> 90 градусов, оценка lambda -> inf
-  05_parabola_curvature   f = x2 на параболах x2 = x1^2 и x2 = -x1^2: одно условие первого порядка, минимум и максимум
-  06_curve_cut            разрез f вдоль кривой: phi(t) = c t^2 для c = 1, 0, -1
-  07_chain_rods           цепь на стержнях: форма, натяжения по стержням, постоянная горизонтальная составляющая
-  08_portfolio_price      f*(rho) портфеля с наклоном lambda_rho; энергия цепи от общей длины с наклоном по множителям
-  09_ipopt_residuals      inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
+  00_circle_hook       введение, задача 1: два решения условия касания — ближайшая и самая далёкая точки окружности
+  00_chain_hook        введение, задача 2: цепь на стержнях из IPOPT и натяжения у опоры и в середине
+  01_review            повторение: задача Л3 §6 — квадрат в круге, линия уровня касается окружности, lambda = -2
+  02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
+  03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
+  04_cusp_licq         §3.1: клюв x2^3 = x1^2 — grad g укорачивается к острию
+  05_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
+  06_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
+  07_chain_rods        §5.1: натяжения стержней и постоянная горизонтальная составляющая
+  08_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
+  09_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
 
 from pathlib import Path
@@ -26,7 +28,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch, Rectangle
 from PIL import Image
 from scipy.linalg import null_space
 from scipy.optimize import fsolve
@@ -50,13 +52,13 @@ plt.rcParams.update({
 MAX_WIDTH = 920        # px: картинка показывается с width="900", уменьшать её нельзя
 
 
-def save(name: str) -> None:
+def save(name: str, min_width: int = 600) -> None:
     plt.tight_layout()
     path = IMG / name
     plt.savefig(path, bbox_inches="tight")
     plt.close()
     w, h = Image.open(path).size
-    assert 600 <= w <= MAX_WIDTH, f"{name}: ширина {w} px — нужна 600–{MAX_WIDTH}, иначе подписи нечитаемы"
+    assert min_width <= w <= MAX_WIDTH, f"{name}: ширина {w} px — нужна {min_width}–{MAX_WIDTH}, иначе подписи нечитаемы"
     print(f"   {name}: {w}x{h}")
 
 
@@ -78,6 +80,19 @@ def circle_points(a=A_CIRCLE):
     """Оба решения системы: (x, lam) ближней и дальней точки."""
     na = np.linalg.norm(a)
     return (a / na, 1 - na), (-a / na, 1 + na)
+
+
+A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружность в пространстве, точка a поднята над плоскостью
+
+
+def sphere_plane(a=A_SPACE):
+    """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
+    Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
+    xs = np.r_[a[:2] / np.linalg.norm(a[:2]), 0.0]
+    gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
+    J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
+    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
+    return xs, gf, J, lam, null_space(J)
 
 
 def cusp_grad(x1):
@@ -149,10 +164,27 @@ def numbers():
     for z0 in ([1, 0.5, 0], [-1, -0.5, 0]):
         z = fsolve(circle_system, z0, xtol=1e-14)
         assert min(abs(z[2] - lmin), abs(z[2] - lmax)) < 1e-8
-    for x1, lam_exp, ang_exp in ((0.1, 2.3, 55), (0.01, 14.6, 72), (0.001, 73, 81)):
-        gg, lam, ang = cusp_grad(x1)
-        assert abs(lam - lam_exp) < 0.15 * lam_exp and abs(ang - ang_exp) < 1, (x1, lam, ang)
-
+    # §2.1: касательная часть grad f в точке (0.5, 0.866) и в минимуме
+    P = np.array([0.5, np.sqrt(3) / 2])
+    assert abs((P - A_CIRCLE) @ np.array([-P[1], P[0]]) - 1.2321) < 1e-4
+    assert abs((xmin - A_CIRCLE) @ np.array([-xmin[1], xmin[0]])) < 1e-12
+    # §2.2: два ограничения — два множителя
+    xs, gf, J, lam2, T = sphere_plane()
+    assert np.allclose(gf, [-1.1056, -0.5528, -1.0], atol=1e-4) and np.allclose(lam2, [-1.2361, -1.0], atol=1e-4)
+    assert np.linalg.matrix_rank(J) == 2 and T.shape == (3, 1) and np.linalg.norm(gf - J.T @ lam2) < 1e-12
+    # повторение: задача Л3 §6, f = -4 x1 x2 на окружности x1^2 + x2^2 = 1
+    x3 = np.array([1, 1]) / np.sqrt(2)
+    assert np.allclose(np.array([-4 * x3[1], -4 * x3[0]]), -2 * 2 * x3)          # grad f = lambda grad g, lambda = -2
+    # §3.1: клюв
+    for x1, lam_exp, g_exp in ((0.1, 2.3, 0.24), (0.01, 14.6, 0.021), (0.001, 73, 0.002)):
+        gg, lam, _ = cusp_grad(x1)
+        assert abs(lam - lam_exp) < 0.05 * lam_exp and abs(np.linalg.norm(gg) - g_exp) < 0.05 * g_exp, (x1, lam, gg)
+    # §4.3: кривизна f вдоль окружности = редуцированный гессиан 1 - lambda
+    th0, h = np.arctan2(1, 2), 1e-4
+    fc = lambda t: 0.5 * np.sum((np.array([np.cos(t), np.sin(t)]) - A_CIRCLE) ** 2)
+    for t, lam in ((th0, lmin), (th0 + np.pi, lmax)):
+        assert abs((fc(t + h) - 2 * fc(t) + fc(t - h)) / h ** 2 - (1 - lam)) < 1e-5
+    # §5.1: цепь на стержнях
     ch = rod_chain()
     v, lam, st = solve_rod_chain(ch)
     chk = chain_checks(ch, v, lam)
@@ -160,7 +192,7 @@ def numbers():
     f_star = ch["w"] * z[1:-1].sum()
     print(f"   цепь: {st['iter_count']} итераций, f* = {f_star:.4f}, z_min = {z.min():.4f}, lam концы/середина = "
           f"{lam[0]:.2f}/{lam[20]:.2f}, F = {chk['F'][0]:.2f}/{chk['F'][20]:.2f} Н, F_h = {chk['Fh'].mean():.3f}, "
-          f"rank J = {chk['rank']}, eig red = {chk['eig'].min():.2f}..{chk['eig'].max():.1f}")
+          f"rank J = {chk['rank']}, eig red = {chk['eig'].min():.2f}..{chk['eig'].max():.1f}, res = {chk['res']:.1e}")
     assert st["iter_count"] == 13 and st["return_status"] == "Solve_Succeeded", st["iter_count"]
     assert abs(f_star - 5.7564) < 1e-3 and abs(z.min() + 0.327) < 1e-3
     assert abs(lam[0] + 97.88) < 0.05 and abs(lam[20] + 55.76) < 0.05
@@ -169,133 +201,183 @@ def numbers():
     assert abs(abs(chk["Fv"][0]) - 19.62) < 0.02 and abs(ch["w"] * ch["N"] - 39.24) < 1e-6   # половина веса
     assert chk["res"] < 1e-9 and chk["rank"] == 41 and chk["Z"].shape == (80, 39)
     assert chk["eig"].min() > 2.1 and 650 < chk["eig"].max() < 700, (chk["eig"].min(), chk["eig"].max())
-    # чувствительность по длине стержней: +1 %
+    # цена длины стержней (упражнение 8.4, демо (e)): +1 %
     ch2 = rod_chain(L_total=5.05)
     v2, _, _ = solve_rod_chain(ch2, v0=v)
     f2 = ch2["w"] * chain_xy(ch2, v2)[1][1:-1].sum()
     f_pred = f_star + lam.sum() * (ch2["ell"] ** 2 - ch["ell"] ** 2)
     assert abs(f2 - 4.886) < 1e-3 and abs(f_pred - 4.873) < 1e-3, (f2, f_pred)
-
+    # §5.2: портфель
     x, fs, lam_pf = portfolio_eq(0.10)
     assert np.allclose(x, [0.0946, 0.3822, 0.3209, 0.2023], atol=2e-4) and abs(fs - 0.008204) < 1e-6
     assert abs(lam_pf[1] - 0.2571) < 1e-4 and abs(lam_pf[0] + 0.0093) < 1e-4, lam_pf
     d = 1e-5
     assert abs((portfolio_eq(0.10 + d)[1] - portfolio_eq(0.10 - d)[1]) / (2 * d) - lam_pf[1]) < 1e-6
+    # §6: лог IPOPT — inf_pr падает примерно вчетверо за итерацию, inf_du держится 2.5–6 с 4-й по 9-ю итерацию
+    it = st["iterations"]; pr, du = np.array(it["inf_pr"]), np.array(it["inf_du"])
+    assert np.all((pr[1:8] / pr[2:9] > 3.5)) and np.all((du[4:10] > 2.5) & (du[4:10] < 6)) and du[-1] < 1e-12, (pr, du)
     return ch, v, lam, st, chk
 
 
 # ---------------------------------------------------------------- рисовалки
 def level_circles(ax, a, levels, color=BLUE, lw=1.2, alpha=0.8):
+    """Линии уровня f = 1/2 |x - a|^2 — окружности вокруг a радиуса sqrt(2 f)."""
     th = np.linspace(0, 2 * np.pi, 400)
     for f in levels:
         r = np.sqrt(2 * f)
         ax.plot(a[0] + r * np.cos(th), a[1] + r * np.sin(th), color=color, lw=lw, alpha=alpha)
 
 
-def unit_circle(ax, color=INK, lw=2.2):
+def unit_circle(ax, color=INK, lw=2.2, **kw):
     th = np.linspace(0, 2 * np.pi, 400)
-    ax.plot(np.cos(th), np.sin(th), color=color, lw=lw, label="$g(x)=0$")
+    ax.plot(np.cos(th), np.sin(th), color=color, lw=lw, **kw)
+
+
+def fig_circle_hook():
+    a = A_CIRCLE
+    (x1, l1), (x2, l2) = circle_points()
+    fig, ax = plt.subplots(figsize=(9.6, 6.2))
+    unit_circle(ax, label="окружность $g(x)=0$")
+    level_circles(ax, a, [0.5 * np.sum((x1 - a) ** 2), 0.5 * np.sum((x2 - a) ** 2)], color=BLUE, lw=1.4, alpha=0.7)
+    ax.plot([], [], color=BLUE, lw=1.4, alpha=0.7, label="линии уровня $f$")
+    ax.plot([x2[0], a[0]], [x2[1], a[1]], ":", color=GRAY, lw=1.2)          # обе точки — на прямой через 0 и a
+    ax.plot(*a, "o", color=INK, ms=7, zorder=7); ax.annotate("$a=(2,1)$", a, (8, 6), textcoords="offset points", fontsize=12)
+    for x, lam, col, name, pos in ((x1, l1, RED, "ближайшая", (1.15, -1.35)), (x2, l2, VIOLET, "самая далёкая", (-2.35, -1.95))):
+        ax.plot(*x, "o", color=col, ms=9, zorder=8)
+        ax.annotate(f"{name}\n$x=({x[0]:.3f},\\ {x[1]:.3f})$\n$\\lambda={lam:.3f}$,  $f={0.5 * np.sum((x - a) ** 2):.3f}$",
+                    xy=x, xytext=pos, fontsize=11, color=col,
+                    arrowprops=dict(arrowstyle="-", color=col, lw=0.8, shrinkA=0, shrinkB=6))
+    ax.set_aspect("equal"); ax.set_xlim(-2.5, 3.7); ax.set_ylim(-2.2, 2.4)
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Два решения условия касания")
+    ax.legend(loc="upper left")
+    save("00_circle_hook.png")
+
+
+def fig_chain_hook(ch, v, chk):
+    y, z = chain_xy(ch, v)
+    fig, ax = plt.subplots(figsize=(8.8, 4.4))
+    ax.plot(y, z, "-", color=INK, lw=1.3); ax.plot(y[1:-1], z[1:-1], "o", color=BLUE, ms=4.5, zorder=5)
+    ax.plot([-2, 2], [1, 1], "s", color=INK, ms=8, zorder=6)
+    for j, off in ((0, (10, -6)), (20, (10, -20))):
+        if j == 0:                                                     # стержень 0 тянет опору к цепи
+            p = np.array([y[0], z[0]]); d = np.array([y[1] - y[0], z[1] - z[0]])
+        else:                                                          # стержень 20 тянет груз 21 к грузу 20
+            p = np.array([y[j + 1], z[j + 1]]); d = np.array([y[j] - y[j + 1], z[j] - z[j + 1]])
+        d /= np.linalg.norm(d)
+        q = p + 0.025 * chk["F"][j] * d
+        arrow(ax, p, q, ORANGE, lw=2.6, ms=16)
+        ax.annotate(f"{chk['F'][j]:.1f} Н", q, off, textcoords="offset points", color=ORANGE, fontsize=13, fontweight="bold")
+    ax.text(0, 1.25, "40 грузов, 41 стержень; стрелки — натяжения", ha="center", fontsize=11, color=GRAY)
+    ax.set_aspect("equal"); ax.set_xlim(-2.6, 2.6); ax.set_ylim(-0.75, 1.45)
+    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Цепь на стержнях: ответ IPOPT")
+    save("00_chain_hook.png")
 
 
 def fig_review():
-    a = A_CIRCLE
-    (xs, lam), _ = circle_points()
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.6), sharey=True)
-    for ax, x, title in ((axes[0], xs, "В минимуме: касание"), (axes[1], np.array([0.5, np.sqrt(3) / 2]), "Не минимум: касания нет")):
-        unit_circle(ax)
-        fx = 0.5 * np.sum((x - a) ** 2)
-        level_circles(ax, a, [fx] + [v for v in (0.3, 1.5, 3.0) if abs(v - fx) > 0.2], color=BLUE)
-        ax.plot(*a, "o", color=INK, ms=6); ax.annotate("$a$", a, (6, 4), textcoords="offset points")
-        gf, gg = x - a, x
-        s = 0.45
-        arrow(ax, x, x + s * gf, RED); arrow(ax, x, x + s * gg, AQUA)
-        ax.annotate(r"$\nabla f$", x + s * gf, (4, -14), textcoords="offset points", color=RED)
-        ax.annotate(r"$\nabla g$", x + s * gg, (4, 4), textcoords="offset points", color=AQUA)
-        if ax is axes[1]:
-            t = np.array([-x[1], x[0]]); tp = (gf @ t) * t
-            arrow(ax, x, x + s * tp, ORANGE, lw=2)
-            ax.annotate("касательная\nчасть", x + s * tp, (-70, 6), textcoords="offset points", color=ORANGE, fontsize=10)
-        ax.plot(*x, "o", color=ORANGE if ax is axes[1] else RED, ms=7, zorder=7)
-        ax.set_aspect("equal"); ax.set_xlim(-1.4, 2.6); ax.set_ylim(-1.4, 2.0)
-        ax.set_title(title); ax.set_xlabel("$x_1$")
-    axes[0].set_ylabel("$x_2$")
-    axes[0].annotate(f"$f={0.5 * np.sum((xs - a) ** 2):.3f}$, $\\lambda={lam:.3f}$", (-1.3, 1.7), fontsize=11)
-    axes[0].legend(loc="lower left")
+    fig, ax = plt.subplots(figsize=(8.4, 6.6))
+    s = 1 / np.sqrt(2)
+    ax.add_patch(Rectangle((-s, -s), 2 * s, 2 * s, facecolor=GRAY, alpha=0.15, edgecolor=GRAY, lw=1.2))
+    ax.text(-0.2, -0.45, "вписанный\nквадрат", ha="center", va="center", color=GRAY, fontsize=11)
+    unit_circle(ax, label="$g(x)=x_1^2+x_2^2-1=0$")
+    t = np.linspace(0.3, 1.7, 300)
+    ax.plot(t, 0.5 / t, color=BLUE, lw=2, label="линия уровня $f=-2$")
+    x = np.array([s, s])
+    arrow(ax, x, x + 0.22 * np.array([-4 * s, -4 * s]), RED); arrow(ax, x, x + 0.22 * np.array([2 * s, 2 * s]), AQUA)
+    ax.annotate(r"$\nabla f$", x + 0.22 * np.array([-4 * s, -4 * s]), (-34, 4), textcoords="offset points", color=RED, fontsize=13)
+    ax.annotate(r"$\nabla g$", x + 0.22 * np.array([2 * s, 2 * s]), (4, 2), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.plot(*x, "o", color=INK, ms=7, zorder=7)
+    ax.annotate("$x^\\ast=(0.707,\\ 0.707)$\n$\\nabla f=\\lambda\\nabla g$, $\\lambda=-2$", xy=x, xytext=(-1.2, 1.3), fontsize=12,
+                arrowprops=dict(arrowstyle="-", color=INK, lw=0.8, shrinkA=0, shrinkB=6))
+    ax.set_aspect("equal"); ax.set_xlim(-1.3, 1.9); ax.set_ylim(-1.3, 1.75)
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Лекция 3: в решении — касание")
+    ax.legend(loc="lower left", fontsize=10)
     save("01_review.png")
 
 
-def fig_circle_two_points():
-    a = A_CIRCLE
-    (x1, l1), (x2, l2) = circle_points()
-    fig, ax = plt.subplots(figsize=(9.2, 6.2))
-    unit_circle(ax)
-    level_circles(ax, a, [0.5 * np.sum((x1 - a) ** 2), 0.5 * np.sum((x2 - a) ** 2)], color=BLUE, lw=1.8)
-    level_circles(ax, a, [0.2, 2.0, 3.5], color=BLUE, lw=0.8, alpha=0.5)
-    ax.plot(*a, "o", color=INK, ms=6); ax.annotate("$a=(2,1)$", a, (6, 4), textcoords="offset points")
-    for x, lam, col, name in ((x1, l1, RED, "минимум"), (x2, l2, VIOLET, "максимум")):
-        gf, gg = x - a, x
-        s = 0.35
-        arrow(ax, x, x + s * gf, RED); arrow(ax, x, x + s * gg, AQUA)
-        ax.plot(*x, "o", color=col, ms=8, zorder=7)
-        ax.annotate(f"$x=({x[0]:.3f},{x[1]:.3f})$\n$\\lambda={lam:.3f}$, $f={0.5 * np.sum((x - a) ** 2):.3f}$\n{name} (§4)",
-                    (1.45, -0.55) if lam < 0 else (-2.1, -1.75), fontsize=11, color=col)
-    ax.annotate(r"$\nabla f$", x1 + 0.35 * (x1 - a), (-22, 6), textcoords="offset points", color=RED)
-    ax.annotate(r"$\nabla g$", x1 + 0.35 * x1, (4, 4), textcoords="offset points", color=AQUA)
-    ax.set_aspect("equal"); ax.set_xlim(-2.2, 3.6); ax.set_ylim(-1.9, 2.5)
-    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Две точки касания, два $\\lambda$")
-    save("02_circle_two_points.png")
-
-
-def fig_tangent_space():
+def fig_circle_tangent():
     a = A_CIRCLE
     (xs, lam), _ = circle_points()
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.6), sharey=True)
-    for ax, x, title in ((axes[0], np.array([np.cos(1.1), np.sin(1.1)]), "Не оптимум: есть касательная часть"),
-                         (axes[1], xs, r"Оптимум: $\nabla f=\lambda\nabla g$")):
-        unit_circle(ax)
-        gf, gg = x - a, x
-        t = np.array([-x[1], x[0]])
-        lam_ls = gf @ gg / (gg @ gg); normal = lam_ls * gg; tang = gf - normal
-        s = 0.5
-        ax.plot([x[0] - 1.2 * t[0], x[0] + 1.2 * t[0]], [x[1] - 1.2 * t[1], x[1] + 1.2 * t[1]], color=GRAY, lw=1.2, ls="--")
-        ax.annotate("$T=\\ker J$", x + 1.1 * t, (4, 4), textcoords="offset points", color=GRAY, fontsize=11)
-        arrow(ax, x, x + s * gf, RED, lw=2.4)
-        arrow(ax, x, x + s * normal, AQUA)
-        if np.linalg.norm(tang) > 1e-6:
-            arrow(ax, x, x + s * tang, ORANGE)
-            ax.plot([x[0] + s * normal[0], x[0] + s * gf[0]], [x[1] + s * normal[1], x[1] + s * gf[1]], color=GRAY, lw=0.8, ls=":")
-            ax.plot([x[0] + s * tang[0], x[0] + s * gf[0]], [x[1] + s * tang[1], x[1] + s * gf[1]], color=GRAY, lw=0.8, ls=":")
-            ax.annotate("касательная часть", x + s * tang, (-50, 8), textcoords="offset points", color=ORANGE, fontsize=10)
-        ax.annotate(r"$\nabla f$", x + s * gf, (-22, -2) if ax is axes[0] else (6, 6), textcoords="offset points", color=RED)
-        ax.annotate(r"$\lambda\nabla g$", x + s * normal, (4, -14) if ax is axes[0] else (-34, -14), textcoords="offset points", color=AQUA)
-        ax.plot(*x, "o", color=INK, ms=6, zorder=7)
-        ax.plot(*a, "o", color=INK, ms=5); ax.annotate("$a$", a, (6, 4), textcoords="offset points")
-        ax.set_aspect("equal"); ax.set_xlim(-1.5, 2.6); ax.set_ylim(-1.3, 2.1); ax.set_title(title); ax.set_xlabel("$x_1$")
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.8), sharey=True)
+    s = 0.5
+    # слева: не минимум
+    ax = axes[0]; P = np.array([0.5, np.sqrt(3) / 2]); t = np.array([-P[1], P[0]]); gf = P - a
+    tang = (gf @ t) * t; norm = (gf @ P) * P
+    unit_circle(ax)
+    ax.plot(*np.c_[P - 1.1 * t, P + 1.1 * t], "--", color=GRAY, lw=1)
+    arrow(ax, P, P + s * gf, RED, lw=2.4)
+    arrow(ax, P, P + s * tang, ORANGE)
+    ax.plot(*np.c_[P + s * tang, P + s * gf], ":", color=GRAY, lw=1)
+    ax.plot(*np.c_[P + s * norm, P + s * gf], ":", color=GRAY, lw=1)
+    ax.annotate(r"$\nabla f$", P + s * gf, (-30, -4), textcoords="offset points", color=RED, fontsize=13)
+    ax.annotate("касательная\nчасть", P + s * tang, (-78, 4), textcoords="offset points", color=ORANGE, fontsize=11)
+    th = np.linspace(np.pi / 3 - 0.06, 0.62, 40)                          # спуск по окружности — против касательной части
+    ax.plot(np.cos(th) * 1.12, np.sin(th) * 1.12, color=BLUE, lw=2.2)
+    arrow(ax, (1.12 * np.cos(th[-2]), 1.12 * np.sin(th[-2])), (1.12 * np.cos(th[-1]), 1.12 * np.sin(th[-1])), BLUE, ms=16)
+    ax.annotate("сюда $f$\nубывает", (1.12 * np.cos(0.8), 1.12 * np.sin(0.8)), (12, 4), textcoords="offset points", color=BLUE, fontsize=11)
+    ax.plot(*P, "o", color=ORANGE, ms=8, zorder=7)
+    ax.set_title("Не минимум: есть касательная часть")
+    # справа: минимум
+    ax = axes[1]; t = np.array([-xs[1], xs[0]]); gf = xs - a
+    unit_circle(ax)
+    ax.plot(*np.c_[xs - 1.1 * t, xs + 1.1 * t], "--", color=GRAY, lw=1)
+    arrow(ax, xs, xs + s * gf, RED, lw=2.4); arrow(ax, xs, xs + s * xs, AQUA)
+    ax.annotate(r"$\nabla f$", xs + s * gf, (-28, -14), textcoords="offset points", color=RED, fontsize=13)
+    ax.annotate(r"$\nabla g$", xs + s * xs, (4, 2), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.annotate(f"$\\nabla f=\\lambda\\nabla g$\n$\\lambda={lam:.3f}$", xs, (-120, -70), textcoords="offset points", fontsize=12)
+    ax.plot(*xs, "o", color=RED, ms=8, zorder=7)
+    ax.set_title("Минимум: касательной части нет")
+    for ax in axes:
+        ax.plot(*a, "o", color=INK, ms=6); ax.annotate("$a$", a, (6, 4), textcoords="offset points", fontsize=12)
+        ax.set_aspect("equal"); ax.set_xlim(-1.45, 2.4); ax.set_ylim(-1.25, 1.75); ax.set_xlabel("$x_1$")
     axes[0].set_ylabel("$x_2$")
-    save("03_tangent_space.png")
+    save("02_circle_tangent.png")
+
+
+def fig_sphere_plane():
+    xs, gf, J, lam, T = sphere_plane()
+    a = A_SPACE
+    fig = plt.figure(figsize=(8.6, 6.0))
+    ax = fig.add_subplot(projection="3d")
+    Y1, Y2 = np.meshgrid(np.linspace(-1.4, 2.4, 2), np.linspace(-1.4, 1.8, 2))
+    ax.plot_surface(Y1, Y2, 0 * Y1, color=GRAY, alpha=0.12, linewidth=0)
+    th = np.linspace(0, 2 * np.pi, 300)
+    ax.plot(np.cos(th), np.sin(th), 0 * th, color=INK, lw=2.2, label="окружность: $g_1=0$, $g_2=0$")
+    ax.plot(*a, "o", color=INK, ms=6); ax.plot([a[0], a[0]], [a[1], a[1]], [0, a[2]], ":", color=GRAY, lw=1.2)
+    ax.text(a[0] - 1.25, a[1], a[2] + 0.05, "$a=(2,1,1)$", fontsize=12)
+    n1, n2 = lam[0] * J[0], lam[1] * J[1]
+    for vec, col, name, off in ((n1, AQUA, r"$\lambda_1\nabla g_1$", (-0.2, 0.0, 0.22)), (n2, VIOLET, r"$\lambda_2\nabla g_2$", (0.08, 0.05, -0.05)),
+                                (gf, RED, r"$\nabla f$", (-0.35, -0.2, -0.12))):
+        ax.quiver(*xs, *vec, color=col, lw=2.4, arrow_length_ratio=0.12)
+        ax.text(*(xs + vec + np.array(off)), name, color=col, fontsize=13)
+    for p, q in ((xs + n1, xs + gf), (xs + n2, xs + gf)):              # параллелограмм: grad f = сумма двух нормалей
+        ax.plot(*np.c_[p, q], ":", color=GRAY, lw=1.2)
+    tt = T[:, 0]
+    ax.plot(*np.c_[xs - 0.9 * tt, xs + 0.9 * tt], "--", color=GRAY, lw=1.4)
+    ax.text(*(xs - 0.95 * tt + np.array([0.05, 0.0, 0.08])), "$T$", color=GRAY, fontsize=13)
+    ax.plot(*xs, "o", color=RED, ms=7)
+    ax.set_xlim(-1.4, 2.4); ax.set_ylim(-1.4, 1.8); ax.set_zlim(-1.2, 1.2)
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_zlabel("$x_3$")
+    ax.set_box_aspect((3.8, 3.2, 2.4)); ax.view_init(elev=22, azim=-58)
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        axis.set_pane_color((1, 1, 1, 0)); axis.set_major_locator(plt.MaxNLocator(3))
+    ax.set_title("Два ограничения — две нормали"); ax.legend(loc="upper left", fontsize=10)
+    save("03_sphere_plane.png")
 
 
 def fig_cusp_licq():
-    fig, axes = plt.subplots(1, 3, figsize=(9.2, 3.6), gridspec_kw=dict(width_ratios=[1.25, 1, 1]))
-    ax = axes[0]
+    fig, ax = plt.subplots(figsize=(8.6, 5.2))
     x1 = np.linspace(-0.7, 0.7, 600)
-    ax.plot(x1, np.abs(x1) ** (2 / 3), color=INK)
-    ax.plot(0, 0, "o", color=RED, ms=8, zorder=7); ax.annotate("$x^\\ast=(0,0)$", (0, 0), (-70, -16), textcoords="offset points", color=RED)
-    for xx, col, off in ((0.5, BLUE, (-6, 6)), (0.1, AQUA, (8, 4)), (0.01, ORANGE, (8, -10))):
+    ax.plot(x1, np.abs(x1) ** (2 / 3), color=INK, lw=2.2)
+    ax.plot(0, 0, "o", color=RED, ms=9, zorder=7); ax.annotate("$x^\\ast=(0,0)$", (0, 0), (-80, -6), textcoords="offset points", color=RED, fontsize=12)
+    for xx, col, off in ((0.5, BLUE, (8, -2)), (0.1, AQUA, (10, 4)), (0.01, ORANGE, (10, -12))):
         p = np.array([xx, xx ** (2 / 3)]); gg = cusp_grad(xx)[0]
-        arrow(ax, p, p + 0.3 * gg, col)
-        ax.annotate(f"$\\nabla g$, $x_1={xx}$", p + 0.3 * gg, off, textcoords="offset points", color=col, fontsize=9)
-    arrow(ax, (-0.55, 0.45), (-0.55, 0.75), RED); ax.annotate(r"$\nabla f=(0,1)$", (-0.55, 0.75), (-28, 5), textcoords="offset points", color=RED, fontsize=10)
-    ax.set_aspect("equal"); ax.set_xlim(-0.75, 1.0); ax.set_ylim(-0.15, 0.95)
-    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Клюв $x_2^3-x_1^2=0$: $\\nabla g\\to0$")
-    xs = np.logspace(-4, -0.3, 80)
-    lam = np.array([cusp_grad(x)[1] for x in xs]); ang = np.array([cusp_grad(x)[2] for x in xs])
-    axes[1].semilogx(xs, ang, color=VIOLET); axes[1].axhline(90, color=GRAY, ls="--", lw=1)
-    axes[1].set_xlabel("$x_1$"); axes[1].set_ylabel("градусы"); axes[1].set_title(r"Угол между $\nabla f$ и $\nabla g$")
-    axes[2].loglog(xs, lam, color=ORANGE, label=r"$\hat\lambda$"); axes[2].loglog(xs, 0.75 * xs ** (-2 / 3), color=GRAY, ls="--", lw=1, label="$0.75\\,x_1^{-2/3}$")
-    axes[2].set_xlabel("$x_1$"); axes[2].set_title(r"Оценка $\lambda$ растёт"); axes[2].legend(fontsize=10)
-    for xx in (0.1, 0.01, 0.001):
-        axes[2].plot(xx, cusp_grad(xx)[1], "o", color=ORANGE, ms=5)
+        arrow(ax, p, p + 0.25 * gg, col, lw=2.2)
+        ax.plot(*p, "o", color=col, ms=5)
+        ax.annotate(f"$\\nabla g$ при $x_1={xx}$", p + 0.25 * gg, off, textcoords="offset points", color=col, fontsize=11)
+    arrow(ax, (-0.5, 0.45), (-0.5, 0.78), RED, lw=2.4)
+    ax.annotate(r"$\nabla f=(0,1)$ везде", (-0.5, 0.78), (-40, 6), textcoords="offset points", color=RED, fontsize=12)
+    ax.set_aspect("equal"); ax.set_xlim(-0.75, 1.0); ax.set_ylim(-0.12, 1.08)
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Кривая $x_2^3=x_1^2$: у острия $\\nabla g\\to0$")
     save("04_cusp_licq.png")
 
 
@@ -305,75 +387,58 @@ def fig_parabola_curvature():
     for ax, c, name, col in ((axes[0], 1.0, "минимум", RED), (axes[1], -1.0, "максимум", VIOLET)):
         for lev in np.arange(-1.0, 1.01, 0.25):                         # линии уровня f = x2 — горизонтали
             ax.axhline(lev, color=BLUE, lw=0.8, alpha=0.45)
-        ax.plot(x1, c * x1 ** 2, color=INK, label="$g=x_2-x_1^2=0$" if c > 0 else "$g=x_2+x_1^2=0$")
-        arrow(ax, (0, 0), (0, 0.5), RED, lw=2.6); arrow(ax, (0, 0), (0, 0.5), AQUA, lw=1.2)
-        ax.annotate(r"$\nabla f=\nabla g=(0,1)$, $\lambda=1$", (0, 0.5), (8, 2), textcoords="offset points", fontsize=11)
-        ax.plot(0, 0, "o", color=col, ms=8, zorder=7); ax.annotate(name, (0, 0), (8, -16), textcoords="offset points", color=col, fontsize=12)
-        ax.set_xlim(-1.1, 1.1); ax.set_ylim(-1.1, 1.1); ax.set_xlabel("$x_1$"); ax.legend(loc="lower left" if c > 0 else "upper left", fontsize=10)
-        ax.set_title(f"$f=x_2$ на параболе, $c={c:+.0f}$".replace("+1", "1"))
+        ax.plot(x1, c * x1 ** 2, color=INK, label="$x_2=x_1^2$" if c > 0 else "$x_2=-x_1^2$")
+        arrow(ax, (0, 0), (0, 0.5), RED, lw=2.6)
+        ax.text(-0.5, 0.74, r"$\nabla f=\nabla g=(0,1)$, $\lambda=1$", fontsize=11)
+        ax.plot(0, 0, "o", color=col, ms=8, zorder=7); ax.annotate(name, (0, 0), (8, -18), textcoords="offset points", color=col, fontsize=13)
+        ax.set_xlim(-1.1, 1.1); ax.set_ylim(-1.1, 1.1); ax.set_xlabel("$x_1$"); ax.legend(loc="lower left" if c > 0 else "upper left", fontsize=11)
+        ax.set_title("$c=1$: парабола вверх" if c > 0 else "$c=-1$: парабола вниз")
     axes[0].set_ylabel("$x_2$")
     save("05_parabola_curvature.png")
 
 
-def fig_curve_cut():
-    fig, ax = plt.subplots(figsize=(7.0, 3.8))
-    t = np.linspace(-1, 1, 200)
-    for c, col, name in ((1, RED, "$c=1$: минимум"), (0, GRAY, "$c=0$: прямая"), (-1, VIOLET, "$c=-1$: максимум")):
-        ax.plot(t, c * t ** 2, color=col, label=name)
-    ax.plot(0, 0, "o", color=INK, ms=6, zorder=7)
-    ax.set_xlabel("$t$ — параметр вдоль кривой $x(t)=(t,\\,ct^2)$"); ax.set_ylabel(r"$\varphi(t)=f(x(t))$")
-    ax.set_title(r"Разрез $f$ вдоль кривой: $\varphi''(0)=p^\top\nabla^2_{xx}L\,p=2c$"); ax.legend()
-    save("06_curve_cut.png")
+def fig_circle_cut():
+    (xmin, lmin), (xmax, lmax) = circle_points()
+    th0 = np.arctan2(xmin[1], xmin[0]); th1 = th0 + np.pi - 2 * np.pi          # дальняя точка, в отрезке [-pi, pi]
+    t = np.linspace(-np.pi, np.pi, 400)
+    fc = 3 - np.sqrt(5) * np.cos(t - th0)                                      # f(cos t, sin t) = 3 - sqrt5 cos(t - th0)
+    fig, ax = plt.subplots(figsize=(8.0, 4.0))
+    ax.plot(t, fc, color=BLUE, label="$f$ в точке окружности с углом $\\theta$")
+    for tc, lam, col, name, pos in ((th0, lmin, RED, "минимум", (th0 + 0.2, 0.2)), (th1, lmax, VIOLET, "максимум", (-3.05, 5.75))):
+        k = 1 - lam                                                            # редуцированный гессиан
+        fv = 3 - np.sqrt(5) * np.cos(tc - th0)
+        tt = np.linspace(max(tc - 1.4, -np.pi), min(tc + 1.4, np.pi), 60)
+        ax.plot(tt, fv + 0.5 * k * (tt - tc) ** 2, "--", color=col, lw=2)
+        ax.plot(tc, fv, "o", color=col, ms=8, zorder=7)
+        ax.text(*pos, f"{name}: кривизна ${k:+.3f}$", color=col, fontsize=12)
+    ax.set_xlim(-np.pi, np.pi); ax.set_ylim(0, 6.4)
+    ax.set_xlabel(r"угол $\theta$ точки на окружности, рад"); ax.set_ylabel("$f$"); ax.set_title("$f$ вдоль окружности")
+    ax.legend(loc="upper right", fontsize=10)
+    save("06_circle_cut.png")
 
 
-def fig_chain_rods(ch, v, lam, chk):
-    y, z = chain_xy(ch, v)
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.0), gridspec_kw=dict(width_ratios=[1.25, 1]))
-    ax = axes[0]
-    ax.plot(y, z, "-", color=INK, lw=1.5); ax.plot(y[1:-1], z[1:-1], "o", color=BLUE, ms=3.5)
-    ax.plot([-2, 2], [1, 1], "s", color=INK, ms=7)
-    for j, lab in ((0, "конец"), (20, "середина")):                      # сила стержня j на груз j + 1 (и на груз j — в обратную сторону)
-        p = np.array([y[j + 1], z[j + 1]]); d = np.array([y[j] - y[j + 1], z[j] - z[j + 1]]); d /= np.linalg.norm(d)
-        q = p + 0.025 * chk["F"][j] * d
-        arrow(ax, p, q, ORANGE, lw=2.4)
-        ax.annotate(f"$F_{{{j}}}={chk['F'][j]:.1f}$ Н", q, (4, 2) if j == 0 else (12, -18), textcoords="offset points", color=ORANGE, fontsize=11)
-    ax.set_aspect("equal"); ax.set_xlim(-2.5, 2.3); ax.set_ylim(-0.7, 1.55)
-    ax.set_xlabel("$y$"); ax.set_ylabel("$z$"); ax.set_title(f"Цепь на стержнях: $f^\\ast={ch['w'] * z[1:-1].sum():.3f}$ Дж")
-    ax = axes[1]
-    j = np.arange(ch["N"] + 1)
-    ax.plot(j, chk["F"], "o-", color=ORANGE, ms=3, label="натяжение $F_j=2|\\lambda_j|\\ell$")
-    ax.plot(j, np.abs(chk["Fh"]), "-", color=AQUA, label=f"горизонтальная: ${abs(chk['Fh'].mean()):.1f}$ Н везде")
-    ax.set_xlabel("номер стержня $j$"); ax.set_ylabel("Н"); ax.set_ylim(0, 27); ax.set_title("$\\lambda_j$ — это сила")
-    ax.legend(loc="lower center", fontsize=10)
+def fig_chain_rods(chk):
+    fig, ax = plt.subplots(figsize=(7.8, 3.8))
+    j = np.arange(len(chk["F"]))
+    ax.plot(j, chk["F"], "o-", color=ORANGE, ms=3.5, label="натяжение $F_j$")
+    ax.plot(j, np.abs(chk["Fh"]), "-", color=AQUA, lw=2.6, label=f"горизонтальная составляющая: {abs(chk['Fh'].mean()):.1f} Н")
+    ax.text(2.0, 25.0, f"{chk['F'][0]:.1f} Н у опоры", color=ORANGE, fontsize=11)
+    ax.annotate(f"{chk['F'][20]:.1f} Н в середине", (20, chk["F"][20]), (-40, 14), textcoords="offset points", color=ORANGE, fontsize=11)
+    ax.set_xlabel("номер стержня $j$"); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 27); ax.set_title("Натяжения стержней")
+    ax.legend(loc="lower center", fontsize=11)
     save("07_chain_rods.png")
 
 
-def fig_portfolio_price(ch, v, lam):
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 3.9))
-    ax = axes[0]
+def fig_portfolio_price():
+    fig, ax = plt.subplots(figsize=(7.6, 4.0))
     rhos = np.linspace(0.06, 0.14, 81)
     fs = np.array([portfolio_eq(r)[1] for r in rhos])
     x0, f0, l0 = portfolio_eq(0.10)
     ax.plot(100 * rhos, fs, color=BLUE, label="$f^\\ast(\\rho)$ — минимальный риск")
     ax.plot(100 * rhos, f0 + l0[1] * (rhos - 0.10), color=ORANGE, ls="--", label=f"касательная, наклон $\\lambda_\\rho={l0[1]:.3f}$")
-    ax.plot(10, f0, "o", color=RED, ms=7, zorder=7)
-    ax.set_xlabel(r"цель доходности $\rho$, %"); ax.set_ylabel(r"$\frac{1}{2}x^\top\Sigma x$"); ax.set_title("Портфель: $\\lambda_\\rho$ — цена доходности")
-    ax.set_ylim(0, 0.025); ax.legend(fontsize=10, loc="upper left")
-    ax = axes[1]
-    Ls = np.linspace(4.9, 5.1, 9)
-    fL = []
-    for L in Ls:
-        chL = rod_chain(L_total=L); vL, _, _ = solve_rod_chain(chL, v0=v)
-        fL.append(chL["w"] * chain_xy(chL, vL)[1][1:-1].sum())
-    fL = np.array(fL)
-    f_star = ch["w"] * chain_xy(ch, v)[1][1:-1].sum()
-    slope = lam.sum() * 2 * ch["ell"] / (ch["N"] + 1)                      # d f*/dL = sum lam_j d(ell^2)/dL
-    ax.plot(Ls, fL, "o-", color=BLUE, ms=4, label="$f^\\ast(L)$ — пересчёт IPOPT")
-    ax.plot(Ls, f_star + slope * (Ls - 5.0), color=ORANGE, ls="--", label=f"наклон по множителям: ${slope:.1f}$ Дж/м")
-    ax.plot(5.0, f_star, "o", color=RED, ms=7, zorder=7)
-    ax.set_xlabel("общая длина цепи $L$, м"); ax.set_ylabel("$f^\\ast$, Дж"); ax.set_title("Цепь: $\\sum\\lambda_j$ — цена длины")
-    ax.legend(fontsize=10, loc="upper right")
-    assert abs(fL[4] - f_star) < 1e-9 and -18 < slope < -17, slope   # (f(5.05) - f(5)) / 0.05 = -17.4
+    ax.plot(10, f0, "o", color=RED, ms=8, zorder=7)
+    ax.set_xlabel(r"цель доходности $\rho$, %"); ax.set_ylabel(r"риск $\frac{1}{2}x^\top\Sigma x$")
+    ax.set_title("Цена доходности — наклон $f^\\ast$"); ax.set_ylim(0, 0.025); ax.legend(fontsize=11, loc="upper left")
     save("08_portfolio_price.png")
 
 
@@ -381,11 +446,11 @@ def fig_ipopt_residuals(st):
     it = st["iterations"]
     pr, du = np.array(it["inf_pr"]), np.array(it["inf_du"])
     k = np.arange(len(pr))
-    fig, ax = plt.subplots(figsize=(7.5, 3.8))
-    ax.semilogy(k, np.maximum(pr, 1e-17), "o-", color=BLUE, ms=4, label=r"inf_pr $=\|g(x_k)\|_\infty$ — допустимость")
+    fig, ax = plt.subplots(figsize=(7.6, 3.9))
+    ax.semilogy(k, np.maximum(pr, 1e-17), "o-", color=BLUE, ms=4, label=r"inf_pr $=\|g(x_k)\|_\infty$ — ограничения")
     ax.semilogy(k, np.maximum(du, 1e-17), "s-", color=ORANGE, ms=4, label=r"inf_du $=\|\nabla_xL(x_k,\lambda_k)\|_\infty$ — стационарность")
     ax.axhline(1e-8, color=GRAY, ls="--", lw=1); ax.annotate("tol $=10^{-8}$", (0.3, 2e-8), color=GRAY, fontsize=10)
-    ax.set_xlabel("итерация IPOPT"); ax.set_ylabel("невязка"); ax.set_title(f"Две невязки системы: {len(pr) - 1} итераций")
+    ax.set_xlabel("итерация IPOPT"); ax.set_ylabel("невязка"); ax.set_title(f"Две невязки IPOPT: {len(pr) - 1} итераций")
     ax.set_ylim(1e-17, 1e4); ax.legend(fontsize=10, loc="lower left")
     save("09_ipopt_residuals.png")
 
@@ -394,12 +459,14 @@ if __name__ == "__main__":
     print("числа конспекта:")
     ch, v, lam, st, chk = numbers()
     print("картинки:")
+    fig_circle_hook()
+    fig_chain_hook(ch, v, chk)
     fig_review()
-    fig_circle_two_points()
-    fig_tangent_space()
+    fig_circle_tangent()
+    fig_sphere_plane()
     fig_cusp_licq()
     fig_parabola_curvature()
-    fig_curve_cut()
-    fig_chain_rods(ch, v, lam, chk)
-    fig_portfolio_price(ch, v, lam)
+    fig_circle_cut()
+    fig_chain_rods(chk)
+    fig_portfolio_price()
     fig_ipopt_residuals(st)
