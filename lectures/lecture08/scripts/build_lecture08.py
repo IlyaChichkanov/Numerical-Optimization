@@ -46,7 +46,7 @@ def demo_parts() -> tuple[nbf.NotebookNode, dict[str, list[nbf.NotebookNode]]]:
     """Возвращает ячейку с импортами и словарь часть -> её ячейки (без шпаргалки)."""
     cells = build_demo08.cells
     assert cells[0].cell_type == "markdown" and cells[0].source.startswith("# Демонстрации")
-    assert cells[1].cell_type == "code" and "def circle_system(" in cells[1].source
+    assert cells[1].cell_type == "code" and "def rod_chain(" in cells[1].source
     parts: dict[str, list[nbf.NotebookNode]] = {}
     current = None
     for cell in cells[2:]:
@@ -73,7 +73,7 @@ def main() -> None:
     helper_body = setup.source.replace("%matplotlib inline\n\n", "", 1)
     (LECTURE / "l8helpers.py").write_text(
         '"""Вспомогательный код демонстраций лекции 8.\n\n'
-        'Окружность: A_CIRCLE, circle_system(z) — система условий первого порядка, circle_points() -> ((x, lam) ближней, дальней).\n'
+        'Окружность: A_CIRCLE = (2, 1), circle_points() -> ((x, lam) ближней, дальней точки); саму систему демо (a) пишет явно.\n'
         'Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.\n'
         'Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).\n'
         'Цепь на стержнях: rod_chain(N, L_total) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)\n'

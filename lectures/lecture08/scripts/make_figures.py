@@ -70,12 +70,6 @@ def arrow(ax, p, q, color, lw=2, ms=14, **kw):
 A_CIRCLE = np.array([2.0, 1.0])            # введение и §2.1: ближайшая к a точка единичной окружности
 
 
-def circle_system(z, a=A_CIRCLE):
-    """Система условий первого порядка для min 1/2|x - a|^2 при 1/2(|x|^2 - 1) = 0: (x - a) - lam x = 0, g = 0."""
-    x, lam = z[:2], z[2]
-    return np.r_[(x - a) - lam * x, 0.5 * (x @ x - 1)]
-
-
 def circle_points(a=A_CIRCLE):
     """Оба решения системы: (x, lam) ближней и дальней точки."""
     na = np.linalg.norm(a)
@@ -88,7 +82,7 @@ A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружност�
 def sphere_plane(a=A_SPACE):
     """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
     Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
-    xs = np.r_[a[:2] / np.linalg.norm(a[:2]), 0.0]
+    xs = np.array([a[0], a[1], 0.0]) / np.hypot(a[0], a[1])   # ближайшая точка: (a1, a2) / |(a1, a2)| в плоскости x3 = 0
     gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
     J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
     lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
@@ -113,7 +107,8 @@ def rod_chain(N=40, L_total=5.0, g_acc=9.81):
     f = w * ca.sum1(z[1:-1])
     g = ca.vertcat(*[(y[j + 1] - y[j]) ** 2 + (z[j + 1] - z[j]) ** 2 - ell ** 2 for j in range(N + 1)])
     t = np.linspace(-2, 2, N + 2)[1:-1]
-    return dict(v=v, f=f, g=g, w=w, ell=ell, N=N, v0=np.r_[t, np.zeros(N)])
+    v0 = np.concatenate([t, np.zeros(N)])                     # старт: грузы равномерно по y на прямой z = 0
+    return dict(v=v, f=f, g=g, w=w, ell=ell, N=N, v0=v0)
 
 
 def solve_rod_chain(ch, v0=None, tol=1e-10):
@@ -125,8 +120,11 @@ def solve_rod_chain(ch, v0=None, tol=1e-10):
 
 
 def chain_xy(ch, v):
+    """Координаты y и z всех точек цепи вместе с опорами (-2, 1) и (2, 1) по краям."""
     N = ch["N"]
-    return np.r_[-2.0, v[:N], 2.0], np.r_[1.0, v[N:], 1.0]
+    y = np.concatenate([[-2.0], v[:N], [2.0]])                # v[:N] — y-координаты грузов
+    z = np.concatenate([[1.0], v[N:], [1.0]])                 # v[N:] — z-координаты грузов
+    return y, z
 
 
 def chain_checks(ch, v, lam):
@@ -153,11 +151,18 @@ def portfolio_eq(rho):
     """min 1/2 x'Sx при 1'x = 1, r'x = rho — только равенства: система ККТ линейна. Возвращает (x, f*, lam)."""
     Aeq = np.c_[np.ones(4), PF_R].T
     K = np.block([[PF_SIGMA, -Aeq.T], [Aeq, np.zeros((2, 2))]])
-    sol = np.linalg.solve(K, np.r_[np.zeros(4), 1.0, rho])
+    rhs = np.concatenate([np.zeros(4), [1.0, rho]])           # правая часть: 0 — стационарность, 1 и rho — ограничения
+    sol = np.linalg.solve(K, rhs)
     return sol[:4], 0.5 * sol[:4] @ PF_SIGMA @ sol[:4], sol[4:]
 
 
 # ---------------------------------------------------------------- числа конспекта
+def circle_system(z, a=A_CIRCLE):
+    """Три уравнения задачи 1: две компоненты grad f = lambda grad g и ограничение (в демо (a) — та же функция)."""
+    x1, x2, lam = z
+    return [x1 - a[0] - lam * x1, x2 - a[1] - lam * x2, x1 ** 2 + x2 ** 2 - 1]
+
+
 def numbers():
     (xmin, lmin), (xmax, lmax) = circle_points()
     assert abs(lmin + 1.2361) < 1e-4 and abs(lmax - 3.2361) < 1e-4 and np.allclose(xmin, [0.8944, 0.4472], atol=1e-4)

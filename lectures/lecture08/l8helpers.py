@@ -1,6 +1,6 @@
 """Вспомогательный код демонстраций лекции 8.
 
-Окружность: A_CIRCLE, circle_system(z) — система условий первого порядка, circle_points() -> ((x, lam) ближней, дальней).
+Окружность: A_CIRCLE = (2, 1), circle_points() -> ((x, lam) ближней, дальней точки); саму систему демо (a) пишет явно.
 Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.
 Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).
 Цепь на стержнях: rod_chain(N, L_total) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)
@@ -20,7 +20,6 @@ import casadi as ca
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import null_space
-from scipy.optimize import fsolve
 
 BLUE, ORANGE, AQUA, YELLOW, RED, VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e34948", "#4a3aa7"
 GRAY, INK = "#8a8985", "#0b0b0b"
@@ -30,12 +29,6 @@ plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.r
 
 # ---------------------------------------------------------------- задачи (те же, что в demo08 / l8helpers.py)
 A_CIRCLE = np.array([2.0, 1.0])            # введение и §2.1: ближайшая к a точка единичной окружности
-
-
-def circle_system(z, a=A_CIRCLE):
-    """Система условий первого порядка для min 1/2|x - a|^2 при 1/2(|x|^2 - 1) = 0: (x - a) - lam x = 0, g = 0."""
-    x, lam = z[:2], z[2]
-    return np.r_[(x - a) - lam * x, 0.5 * (x @ x - 1)]
 
 
 def circle_points(a=A_CIRCLE):
@@ -50,7 +43,7 @@ A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружност�
 def sphere_plane(a=A_SPACE):
     """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
     Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
-    xs = np.r_[a[:2] / np.linalg.norm(a[:2]), 0.0]
+    xs = np.array([a[0], a[1], 0.0]) / np.hypot(a[0], a[1])   # ближайшая точка: (a1, a2) / |(a1, a2)| в плоскости x3 = 0
     gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
     J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
     lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
@@ -75,7 +68,8 @@ def rod_chain(N=40, L_total=5.0, g_acc=9.81):
     f = w * ca.sum1(z[1:-1])
     g = ca.vertcat(*[(y[j + 1] - y[j]) ** 2 + (z[j + 1] - z[j]) ** 2 - ell ** 2 for j in range(N + 1)])
     t = np.linspace(-2, 2, N + 2)[1:-1]
-    return dict(v=v, f=f, g=g, w=w, ell=ell, N=N, v0=np.r_[t, np.zeros(N)])
+    v0 = np.concatenate([t, np.zeros(N)])                     # старт: грузы равномерно по y на прямой z = 0
+    return dict(v=v, f=f, g=g, w=w, ell=ell, N=N, v0=v0)
 
 
 def solve_rod_chain(ch, v0=None, tol=1e-10):
@@ -87,8 +81,11 @@ def solve_rod_chain(ch, v0=None, tol=1e-10):
 
 
 def chain_xy(ch, v):
+    """Координаты y и z всех точек цепи вместе с опорами (-2, 1) и (2, 1) по краям."""
     N = ch["N"]
-    return np.r_[-2.0, v[:N], 2.0], np.r_[1.0, v[N:], 1.0]
+    y = np.concatenate([[-2.0], v[:N], [2.0]])                # v[:N] — y-координаты грузов
+    z = np.concatenate([[1.0], v[N:], [1.0]])                 # v[N:] — z-координаты грузов
+    return y, z
 
 
 def chain_checks(ch, v, lam):
@@ -115,7 +112,8 @@ def portfolio_eq(rho):
     """min 1/2 x'Sx при 1'x = 1, r'x = rho — только равенства: система ККТ линейна. Возвращает (x, f*, lam)."""
     Aeq = np.c_[np.ones(4), PF_R].T
     K = np.block([[PF_SIGMA, -Aeq.T], [Aeq, np.zeros((2, 2))]])
-    sol = np.linalg.solve(K, np.r_[np.zeros(4), 1.0, rho])
+    rhs = np.concatenate([np.zeros(4), [1.0, rho]])           # правая часть: 0 — стационарность, 1 и rho — ограничения
+    sol = np.linalg.solve(K, rhs)
     return sol[:4], 0.5 * sol[:4] @ PF_SIGMA @ sol[:4], sol[4:]
 
 
@@ -128,5 +126,6 @@ def level_circles(ax, a, levels, color=BLUE, lw=1.2, alpha=0.8):
 
 
 def unit_circle(ax, color=INK, lw=2.2):
+    """Единичная окружность — ограничение задачи 1."""
     th = np.linspace(0, 2 * np.pi, 400)
     ax.plot(np.cos(th), np.sin(th), color=color, lw=lw)
