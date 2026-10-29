@@ -8,17 +8,17 @@
 
 Картинки в порядке появления в конспекте:
   00_circle_hook       введение, задача 1: два решения условия касания — ближайшая и самая далёкая точки окружности
-  00_chain_hook        введение, задача 2: цепь из трёх грузов на четырёх стержнях из IPOPT и натяжения стержней
-  00_chain_forces      введение, задача 2: три силы на груз 1 и их треугольник — равновесие
+  00_chain_hook        введение, задача 2: цепь из трёх грузов на четырёх стержнях — обозначения и проекции стержня 0
   01_review            повторение: задача Л3 §6 — квадрат в круге, линия уровня касается окружности, lambda = -2
   02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
   03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
   04_sphere_touch      §3.1: плоскость x3 = c касается сферы — вид сбоку при c = 0.6 и c = 1, нормали становятся параллельными
   05_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
   06_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
-  07_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
-  08_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
-  09_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
+  07_chain_forces      §5.1: три силы на груз 1 и их треугольник — равновесие
+  08_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
+  09_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
+  10_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
 
 from pathlib import Path
@@ -307,17 +307,21 @@ def fig_chain_hook(ch, v, chk):
     for i, dx in ((0, -8), (4, 8)):
         ax.annotate(f"опора {i}", (y[i], z[i]), (dx, 10), textcoords="offset points", ha="right" if i == 0 else "left",
                     color=INK, fontsize=11)
-    for j in range(4):                                                                 # подпись у середины стержня, внутри цепи
+    for j in range(4):                                                                 # номер стержня — снаружи цепи
         mid = np.array([(y[j] + y[j + 1]) / 2, (z[j] + z[j + 1]) / 2])
         d = np.array([y[j + 1] - y[j], z[j + 1] - z[j]])
         nrm = np.array([-d[1], d[0]]) / np.linalg.norm(d)
-        nrm = nrm if nrm[1] > 0 else -nrm
-        ax.annotate(f"стержень {j}\n{chk['F'][j]:.1f} Н", mid, tuple(30 * nrm), textcoords="offset points",
-                    ha="center", va="center", color=ORANGE, fontsize=11, fontweight="bold")
-    ax.text(0, 1.32, r"стержни по $\ell=1.25$ м, грузы по 1 кг; числа — натяжения $2|\lambda_j|\ell$",
-            ha="center", fontsize=11, color=GRAY)
+        nrm = nrm if nrm[1] < 0 else -nrm
+        off = 46 if j in (0, 3) else 26                                                # крутые стержни — подпись дальше
+        ax.annotate(f"стержень {j}", mid, tuple(off * nrm), textcoords="offset points", ha="center", va="center",
+                    color=GRAY, fontsize=11)
+    corner = (y[1], z[0])                                                              # проекции стержня 0
+    ax.plot([y[0], corner[0], corner[0]], [z[0], corner[1], z[1]], "--", color=ORANGE, lw=1.6, zorder=2)
+    ax.annotate(r"$\Delta y_0$", ((y[0] + y[1]) / 2, z[0]), (0, 7), textcoords="offset points", ha="center", color=ORANGE, fontsize=13)
+    ax.annotate(r"$\Delta z_0$", (corner[0], (z[0] + z[1]) / 2), (7, 0), textcoords="offset points", va="center", color=ORANGE, fontsize=13)
+    ax.text(0, 1.32, r"стержни по $\ell=1.25$ м, грузы по 1 кг", ha="center", fontsize=11, color=GRAY)
     ax.set_aspect("equal"); ax.set_xlim(-2.7, 2.7); ax.set_ylim(-0.85, 1.5)
-    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Ответ IPOPT: три груза, четыре стержня")
+    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Цепь: три груза, четыре стержня")
     save("00_chain_hook.png")
 
 
@@ -356,7 +360,7 @@ def fig_chain_forces(ch, v, lam):
     bx.annotate("начало = конец:\nсумма $=0$", (0, 0), (10, 2), textcoords="offset points", fontsize=11, color=INK, va="bottom")
     bx.set_aspect("equal"); bx.set_xlim(-9, 19); bx.set_ylim(-19.5, 5.5)
     bx.set_xlabel("Н"); bx.set_ylabel("Н"); bx.set_title("Сложим их по очереди")
-    save("00_chain_forces.png")
+    save("07_chain_forces.png")
 
 
 def fig_review():
@@ -544,7 +548,7 @@ def fig_chain_rods(chk):
     ax.set_xticks(j, [f"стержень {k}" for k in j]); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 31)
     ax.set_title("Горизонтальная составляющая везде одна"); ax.grid(axis="x", visible=False)
     ax.legend(loc="upper center", ncol=3, fontsize=10)
-    save("07_chain_rods.png")
+    save("08_chain_rods.png")
 
 
 def fig_portfolio_price():
@@ -557,7 +561,7 @@ def fig_portfolio_price():
     ax.plot(10, f0, "o", color=RED, ms=8, zorder=7)
     ax.set_xlabel(r"цель доходности $\rho$, %"); ax.set_ylabel(r"риск $\frac{1}{2}x^\top\Sigma x$")
     ax.set_title("Цена доходности — наклон $f^\\ast$"); ax.set_ylim(0, 0.025); ax.legend(fontsize=11, loc="upper left")
-    save("08_portfolio_price.png")
+    save("09_portfolio_price.png")
 
 
 def fig_ipopt_residuals(st):
@@ -570,7 +574,7 @@ def fig_ipopt_residuals(st):
     ax.axhline(1e-8, color=GRAY, ls="--", lw=1); ax.annotate("tol $=10^{-8}$", (0.3, 2e-8), color=GRAY, fontsize=10)
     ax.set_xlabel("итерация IPOPT"); ax.set_ylabel("невязка"); ax.set_title(f"Две невязки IPOPT: {len(pr) - 1} итераций")
     ax.set_ylim(1e-17, 1e4); ax.legend(fontsize=10, loc="lower left")
-    save("09_ipopt_residuals.png")
+    save("10_ipopt_residuals.png")
 
 
 if __name__ == "__main__":
@@ -579,13 +583,13 @@ if __name__ == "__main__":
     print("картинки:")
     fig_circle_hook()
     fig_chain_hook(ch, v, chk)
-    fig_chain_forces(ch, v, lam)
     fig_review()
     fig_circle_tangent()
     fig_sphere_plane()
     fig_sphere_touch()
     fig_parabola_curvature()
     fig_circle_cut()
+    fig_chain_forces(ch, v, lam)
     fig_chain_rods(chk)
     fig_portfolio_price()
     fig_ipopt_residuals(st)
