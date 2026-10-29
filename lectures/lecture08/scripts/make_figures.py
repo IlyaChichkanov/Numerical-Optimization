@@ -8,7 +8,7 @@
 
 Картинки в порядке появления в конспекте:
   00_circle_hook       введение, задача 1: два решения условия касания — ближайшая и самая далёкая точки окружности
-  00_chain_hook        введение, задача 2: цепь из трёх грузов на четырёх стержнях — обозначения и проекции стержня 0
+  00_chain_hook        введение, задача 2: цепь из трёх грузов на четырёх стержнях — номера опор, грузов и стержней
   01_review            повторение: задача Л3 §6 — квадрат в круге, линия уровня касается окружности, lambda = -2
   02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
   03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
@@ -303,22 +303,19 @@ def fig_chain_hook(ch, v, chk):
     ax.plot([y[0], y[-1]], [z[0], z[-1]], "s", color=INK, ms=10, zorder=6)            # опоры
     ax.plot(y[1:-1], z[1:-1], "o", color=BLUE, ms=13, zorder=7)                       # грузы
     for i in (1, 2, 3):
-        ax.annotate(f"груз {i}", (y[i], z[i]), (0, -26), textcoords="offset points", ha="center", color=BLUE, fontsize=12)
+        ax.annotate(f"груз {i}\n$(y_{i},\\ z_{i})$", (y[i], z[i]), (0, -14), textcoords="offset points", ha="center", va="top",
+                    color=BLUE, fontsize=12)
     for i, dx in ((0, -8), (4, 8)):
         ax.annotate(f"опора {i}", (y[i], z[i]), (dx, 10), textcoords="offset points", ha="right" if i == 0 else "left",
                     color=INK, fontsize=11)
-    for j in range(4):                                                                 # номер стержня — снаружи цепи
+    for j in range(4):                                                                 # номер стержня — в стороне от подписей грузов
         mid = np.array([(y[j] + y[j + 1]) / 2, (z[j] + z[j + 1]) / 2])
         d = np.array([y[j + 1] - y[j], z[j + 1] - z[j]])
         nrm = np.array([-d[1], d[0]]) / np.linalg.norm(d)
-        nrm = nrm if nrm[1] < 0 else -nrm
-        off = 46 if j in (0, 3) else 26                                                # крутые стержни — подпись дальше
+        nrm = nrm if (nrm[1] < 0) == (j in (0, 3)) else -nrm                            # крайние — снизу, средние — сверху
+        off = 46 if j in (0, 3) else 22                                                # крутые стержни — подпись дальше
         ax.annotate(f"стержень {j}", mid, tuple(off * nrm), textcoords="offset points", ha="center", va="center",
                     color=GRAY, fontsize=11)
-    corner = (y[1], z[0])                                                              # проекции стержня 0
-    ax.plot([y[0], corner[0], corner[0]], [z[0], corner[1], z[1]], "--", color=ORANGE, lw=1.6, zorder=2)
-    ax.annotate(r"$\Delta y_0$", ((y[0] + y[1]) / 2, z[0]), (0, 7), textcoords="offset points", ha="center", color=ORANGE, fontsize=13)
-    ax.annotate(r"$\Delta z_0$", (corner[0], (z[0] + z[1]) / 2), (7, 0), textcoords="offset points", va="center", color=ORANGE, fontsize=13)
     ax.text(0, 1.32, r"стержни по $\ell=1.25$ м, грузы по 1 кг", ha="center", fontsize=11, color=GRAY)
     ax.set_aspect("equal"); ax.set_xlim(-2.7, 2.7); ax.set_ylim(-0.85, 1.5)
     ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Цепь: три груза, четыре стержня")
