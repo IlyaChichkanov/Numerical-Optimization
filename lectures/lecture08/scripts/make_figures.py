@@ -373,7 +373,8 @@ def fig_circle_tangent():
     th = np.linspace(np.pi / 3 - 0.06, 0.62, 40)                          # спуск по окружности — против касательной части
     ax.plot(np.cos(th) * 1.12, np.sin(th) * 1.12, color=BLUE, lw=2.2)
     arrow(ax, (1.12 * np.cos(th[-2]), 1.12 * np.sin(th[-2])), (1.12 * np.cos(th[-1]), 1.12 * np.sin(th[-1])), BLUE, ms=16)
-    ax.annotate("сюда $f$\nубывает", (1.12 * np.cos(0.8), 1.12 * np.sin(0.8)), (12, 4), textcoords="offset points", color=BLUE, fontsize=11)
+    ax.annotate("движение сюда\nуменьшает $f$", (1.12 * np.cos(0.75), 1.12 * np.sin(0.75)), (0.95, 1.38), color=BLUE, fontsize=11,
+                arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8, shrinkA=2, shrinkB=4))      # подпись в свободном углу
     ax.plot(*P, "o", color=ORANGE, ms=8, zorder=7)
     ax.set_title("Не минимум: есть касательная часть")
     # справа: минимум
