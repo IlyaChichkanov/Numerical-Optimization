@@ -2,7 +2,7 @@
 
 Запуск:  uv run --group casadi python lectures/lecture08/scripts/make_figures.py
 
-Скрипт самодостаточен: окружность, окружность в пространстве, клюв, параболы, цепь на стержнях и портфель
+Скрипт самодостаточен: окружность, окружность в пространстве (и плоскость, касающаяся сферы), параболы, цепь на стержнях и портфель
 определены здесь тем же кодом, что в build_demo08.py / l8helpers.py; числа конспекта считаются в скрипте и
 проверяются ассертами. Цепь на стержнях и её множители — через CasADi + IPOPT.
 
@@ -13,7 +13,7 @@
   01_review            повторение: задача Л3 §6 — квадрат в круге, линия уровня касается окружности, lambda = -2
   02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
   03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
-  04_cusp_licq         §3.1: клюв x2^3 = x1^2 — grad g укорачивается к острию
+  04_sphere_touch      §3.1: плоскость x3 = c касается сферы — вид сбоку при c = 0.6 и c = 1, нормали становятся параллельными
   05_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
   06_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
   07_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
@@ -80,23 +80,26 @@ def circle_points(a=A_CIRCLE):
 A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружность в пространстве, точка a поднята над плоскостью
 
 
-def sphere_plane(a=A_SPACE):
-    """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
-    Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
-    xs = np.array([a[0], a[1], 0.0]) / np.hypot(a[0], a[1])   # ближайшая точка: (a1, a2) / |(a1, a2)| в плоскости x3 = 0
+def sphere_plane(a=A_SPACE, c=0.0):
+    """Сфера g1 = 1/2(|x|^2 - 1) = 0 и плоскость g2 = x3 - c = 0; ближайшая к a точка их пересечения.
+    При c < 1 пересечение — окружность радиуса sqrt(1 - c^2) (§2.2: c = 0), при c = 1 — одна точка (0, 0, 1) (§3.1).
+    Возвращает (x*, grad f, J, lam, базис T = null_space(J)); при c = 1 lam — лучшее приближение, точного нет."""
+    r = np.sqrt(max(1.0 - c ** 2, 0.0))                       # радиус окружности пересечения
+    s = np.hypot(a[0], a[1])                                   # длина горизонтальной части a
+    xs = np.array([r * a[0] / s, r * a[1] / s, c])             # ближайшая точка: над направлением (a1, a2), на высоте c
     gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
     J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
-    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
+    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam методом наименьших квадратов
     return xs, gf, J, lam, null_space(J)
 
 
-def cusp_grad(x1):
-    """Клюв g = x2^3 - x1^2 = 0, f = x2: в точке кривой x2 = x1^(2/3) возвращает grad g, оценку lambda, угол к grad f (град)."""
-    x2 = x1 ** (2 / 3)
-    gf, gg = np.array([0.0, 1.0]), np.array([-2 * x1, 3 * x2 ** 2])
-    lam = gf @ gg / (gg @ gg)                                  # наименьшие квадраты для grad f = lam grad g
-    ang = np.degrees(np.arccos(gf @ gg / np.linalg.norm(gg)))
-    return gg, lam, ang
+def solve_eq(x, f, g, x0):
+    """IPOPT для min f при g(x) = 0 (CasADi). Возвращает (x*, lam* в нашем знаке L = f - lam^T g, итерации, rank J)."""
+    solver = ca.nlpsol("s", "ipopt", {"x": x, "f": f, "g": g}, {"ipopt.print_level": 0, "print_time": 0, "ipopt.sb": "yes"})
+    sol = solver(x0=x0, lbg=0, ubg=0)                          # lbg = ubg = 0: ограничения — равенства
+    xs = np.array(sol["x"]).ravel()
+    J = ca.Function("J", [x], [ca.jacobian(g, x)])(xs).full()  # якобиан ограничений в ответе
+    return xs, -np.array(sol["lam_g"]).ravel(), solver.stats()["iter_count"], np.linalg.matrix_rank(J, tol=1e-6)
 
 
 def rod_chain(N=3, L_total=5.0, m=1.0, g_acc=9.81):
@@ -181,10 +184,23 @@ def numbers():
     # повторение: задача Л3 §6, f = -4 x1 x2 на окружности x1^2 + x2^2 = 1
     x3 = np.array([1, 1]) / np.sqrt(2)
     assert np.allclose(np.array([-4 * x3[1], -4 * x3[0]]), -2 * 2 * x3)          # grad f = lambda grad g, lambda = -2
-    # §3.1: клюв
-    for x1, lam_exp, g_exp in ((0.1, 2.3, 0.24), (0.01, 14.6, 0.021), (0.001, 73, 0.002)):
-        gg, lam, _ = cusp_grad(x1)
-        assert abs(lam - lam_exp) < 0.05 * lam_exp and abs(np.linalg.norm(gg) - g_exp) < 0.05 * g_exp, (x1, lam, gg)
+    # §3.1: плоскость x3 = c поднимается к касанию; lambda_1 = 1 - sqrt5 / sqrt(1 - c^2)
+    for c, lam1 in ((0.6, -1.7951), (0.9, -4.1299), (0.99, -14.8511), (0.999, -49.0125)):
+        xs_c, gf_c, J_c, lam_c, T_c = sphere_plane(c=c)
+        assert abs(lam_c[0] - lam1) < 1e-3 and abs(lam_c[0] - (1 - np.sqrt(5) / np.sqrt(1 - c ** 2))) < 1e-9
+        assert np.linalg.norm(gf_c - J_c.T @ lam_c) < 1e-9 and T_c.shape == (3, 1)
+    xs1, gf1, J1, lam_1, T1 = sphere_plane(c=1.0)
+    assert np.allclose(xs1, [0, 0, 1]) and np.allclose(gf1, [-2, -1, 0]) and np.linalg.matrix_rank(J1) == 1
+    assert T1.shape == (3, 2) and abs(np.linalg.norm(gf1 - J1.T @ lam_1) - np.sqrt(5)) < 1e-12   # точного lambda нет
+    x3 = ca.SX.sym("x", 3); f3 = 0.5 * ca.sumsqr(x3 - ca.DM(A_SPACE))
+    for c, it_exp in ((0.0, 5), (0.9, 5), (0.99, 8), (0.999, 10), (1.0, 47)):
+        xs_i, lam_i, it, rk = solve_eq(x3, f3, ca.vertcat(0.5 * (ca.sumsqr(x3) - 1), x3[2] - c), [0.5, 0.5, c])
+        print(f"   плоскость c = {c}: {it} итераций IPOPT, rank J = {rk}, lam = {lam_i.round(3)}")
+        assert it == it_exp and rk == (1 if c == 1.0 else 2), (c, it, rk)
+        if c < 1.0:
+            assert abs(lam_i[0] - (1 - np.sqrt(5) / np.sqrt(1 - c ** 2))) < 1e-4
+        else:                                                  # точка найдена, а множители — порядка 10^8
+            assert np.allclose(xs_i, [0, 0, 1], atol=1e-6) and 1e8 < np.abs(lam_i).min() < 1e9
     # §4.3: кривизна f вдоль окружности = редуцированный гессиан 1 - lambda
     th0, h = np.arctan2(1, 2), 1e-4
     fc = lambda t: 0.5 * np.sum((np.array([np.cos(t), np.sin(t)]) - A_CIRCLE) ** 2)
@@ -425,21 +441,49 @@ def fig_sphere_plane():
     save("03_sphere_plane.png")
 
 
-def fig_cusp_licq():
-    fig, ax = plt.subplots(figsize=(8.6, 5.2))
-    x1 = np.linspace(-0.7, 0.7, 600)
-    ax.plot(x1, np.abs(x1) ** (2 / 3), color=INK, lw=2.2)
-    ax.plot(0, 0, "o", color=RED, ms=9, zorder=7); ax.annotate("$x^\\ast=(0,0)$", (0, 0), (-80, -6), textcoords="offset points", color=RED, fontsize=12)
-    for xx, col, off in ((0.5, BLUE, (8, -2)), (0.1, AQUA, (10, 4)), (0.01, ORANGE, (10, -12))):
-        p = np.array([xx, xx ** (2 / 3)]); gg = cusp_grad(xx)[0]
-        arrow(ax, p, p + 0.25 * gg, col, lw=2.2)
-        ax.plot(*p, "o", color=col, ms=5)
-        ax.annotate(f"$\\nabla g$ при $x_1={xx}$", p + 0.25 * gg, off, textcoords="offset points", color=col, fontsize=11)
-    arrow(ax, (-0.5, 0.45), (-0.5, 0.78), RED, lw=2.4)
-    ax.annotate(r"$\nabla f=(0,1)$ везде", (-0.5, 0.78), (-40, 6), textcoords="offset points", color=RED, fontsize=12)
-    ax.set_aspect("equal"); ax.set_xlim(-0.75, 1.0); ax.set_ylim(-0.12, 1.08)
-    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Кривая $x_2^3=x_1^2$: у острия $\\nabla g\\to0$")
-    save("04_cusp_licq.png")
+def side_view(ax, c):
+    """Вид сбоку на §3.1: разрез через ось x3 и точку a. Сфера — окружность, плоскость x3 = c — прямая.
+    Горизонтальная ось идёт вдоль (a1, a2), поэтому a = (sqrt5, 1), а x* = (r, c)."""
+    xs, gf, J, lam, T = sphere_plane(c=c)
+    r = np.hypot(xs[0], xs[1])
+    P, A = np.array([r, c]), np.array([np.sqrt(5), 1.0])     # x* и a в координатах вида сбоку
+    unit_circle(ax, lw=2)
+    ax.plot([-1.45, 2.55], [c, c], color=GRAY, lw=2)          # плоскость x3 = c
+    if r > 0:
+        ax.plot([-r, r], [c, c], color=BLUE, lw=6, alpha=0.45, solid_capstyle="round")   # окружность пересечения с ребра
+    ax.plot(*A, "o", color=INK, ms=6); ax.annotate("$a$", A, (5, 5), textcoords="offset points", fontsize=12)
+    n1 = P / np.linalg.norm(P)                                  # grad g1 = x*, единичный
+    dx = 0.0 if r > 0 else 0.05                                 # при касании нормали совпадают — разводим чуть-чуть
+    arrow(ax, P - [dx, 0], P - [dx, 0] + 0.55 * n1, AQUA, lw=2.4)
+    arrow(ax, P + [dx, 0], P + [dx, 0] + np.array([0, 0.55]), VIOLET, lw=2.4)
+    g = np.array([r - np.sqrt(5), c - 1.0])                     # grad f = x* - a в тех же координатах
+    arrow(ax, P, P + 0.35 * g, RED, lw=2.4)
+    ax.plot(*P, "o", color=RED, ms=8, zorder=8)
+    return P, n1, g
+
+
+def fig_sphere_touch():
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.5), sharey=True)
+    ax = axes[0]
+    P, n1, g = side_view(ax, 0.6)
+    ax.annotate(r"$\nabla g_1$", P + 0.55 * n1, (4, 2), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.annotate(r"$\nabla g_2$", P + np.array([0, 0.55]), (-30, 4), textcoords="offset points", color=VIOLET, fontsize=13)
+    ax.annotate(r"$\nabla f$", P + 0.35 * g, (-2, -22), textcoords="offset points", color=RED, fontsize=13)
+    ax.text(-0.85, 0.44, "окружность\nпересечения", color=BLUE, fontsize=10, va="top")          # под хордой, внутри сферы
+    ax.set_title("$c=0.6$: нормали не параллельны")
+    ax = axes[1]
+    P, n1, g = side_view(ax, 1.0)
+    ax.annotate(r"$\nabla g_1$", P + 0.55 * n1 - [0.05, 0], (-34, -4), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.annotate(r"$\nabla g_2$", P + [0.05, 0.55], (5, -4), textcoords="offset points", color=VIOLET, fontsize=13)
+    ax.annotate(r"$\nabla f$", P + 0.35 * g, (-4, -22), textcoords="offset points", color=RED, fontsize=13)
+    ax.text(1.06, 0.93, "$Jp=0$: вся плоскость\n$p_3=0$", color=GRAY, fontsize=11, va="top")      # справа под прямой
+    ax.text(0, 0.78, "допустимая\nточка одна", color=RED, fontsize=11, va="top", ha="center")    # внутри сферы, под точкой
+    ax.set_title("$c=1$: нормали параллельны")
+    for ax in axes:
+        ax.set_aspect("equal"); ax.set_xlim(-1.45, 2.7); ax.set_ylim(-1.15, 1.75)
+        ax.set_xlabel("вдоль $(a_1,a_2)$")
+    axes[0].set_ylabel("$x_3$")
+    save("04_sphere_touch.png")
 
 
 def fig_parabola_curvature():
@@ -529,7 +573,7 @@ if __name__ == "__main__":
     fig_review()
     fig_circle_tangent()
     fig_sphere_plane()
-    fig_cusp_licq()
+    fig_sphere_touch()
     fig_parabola_curvature()
     fig_circle_cut()
     fig_chain_rods(chk)

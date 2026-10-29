@@ -2,8 +2,9 @@
 
 Запуск:  uv run python lectures/lecture08/scripts/make_animations.py
 
-  10_licq_breaks.gif   точка скользит по клюву x2 = x1^(2/3) к острию: grad g укорачивается и ложится горизонтально,
-                       оценка lambda растёт (§3.1); числа те же, что в make_figures.py (cusp_grad)
+  10_plane_touch.gif   плоскость x3 = c поднимается к верху сферы (§3.1, вид сбоку): окружность пересечения сжимается
+                       в точку, угол между нормалями уходит в ноль, lambda_1 = 1 - sqrt5 / sqrt(1 - c^2) — в минус
+                       бесконечность; числа те же, что в make_figures.py (sphere_plane)
 """
 
 from pathlib import Path
@@ -17,50 +18,58 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.patches import FancyArrowPatch
 
 IMG = Path(__file__).resolve().parent.parent / "img"
-BLUE, ORANGE, AQUA, RED, GRAY, INK = "#2a78d6", "#eb6834", "#1baf7a", "#e34948", "#8a8985", "#0b0b0b"
+BLUE, AQUA, RED, VIOLET, GRAY, INK = "#2a78d6", "#1baf7a", "#e34948", "#4a3aa7", "#8a8985", "#0b0b0b"
 plt.rcParams.update({"font.size": 11, "axes.spines.top": False, "axes.spines.right": False,
                      "axes.grid": True, "grid.alpha": 0.2, "lines.linewidth": 2, "legend.frameon": False})
 FPS, DPI, HOLD = 12, 80, 8
+S5 = np.sqrt(5.0)                                              # |(a1, a2)| для a = (2, 1, 1)
 
 
-def cusp_grad(x1):
-    x2 = x1 ** (2 / 3)
-    gf, gg = np.array([0.0, 1.0]), np.array([-2 * x1, 3 * x2 ** 2])
-    return gg, gf @ gg / (gg @ gg), np.degrees(np.arccos(gf @ gg / np.linalg.norm(gg)))
-
-
-def licq_breaks():
-    xs = np.logspace(np.log10(0.6), np.log10(0.002), 64)
-    frames = [xs[0]] * HOLD + list(xs) + [xs[-1]] * HOLD
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    t = np.linspace(-0.7, 0.7, 500)
-    ax.plot(t, np.abs(t) ** (2 / 3), color=INK)
-    ax.plot(0, 0, "o", color=RED, ms=7); ax.annotate("$x^\\ast$", (0, 0), (6, -14), textcoords="offset points", color=RED)
-    ax.set_aspect("equal"); ax.set_xlim(-0.75, 0.95); ax.set_ylim(-0.12, 0.95); ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
-    pt, = ax.plot([], [], "o", color=BLUE, ms=7, zorder=7)
+def plane_touch():
+    t = np.linspace(0, 1, 64)
+    cs = 1 - (1 - t) ** 2                                      # c от 0 до 1, у касания — медленнее
+    frames = [cs[0]] * HOLD + list(cs) + [cs[-1]] * HOLD
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    th = np.linspace(0, 2 * np.pi, 400)
+    ax.plot(np.cos(th), np.sin(th), color=INK, lw=2)          # сфера (вид сбоку)
+    ax.plot(S5, 1.0, "o", color=INK, ms=6); ax.annotate("$a$", (S5, 1.0), (5, 5), textcoords="offset points")
+    ax.set_aspect("equal"); ax.set_xlim(-1.45, 2.6); ax.set_ylim(-1.1, 1.7)
+    ax.set_xlabel("вдоль $(a_1,a_2)$"); ax.set_ylabel("$x_3$")
+    plane, = ax.plot([], [], color=GRAY, lw=2)
+    chord, = ax.plot([], [], color=BLUE, lw=6, alpha=0.45, solid_capstyle="round")
+    pt, = ax.plot([], [], "o", color=RED, ms=8, zorder=8)
     arrows = []
+    ax.text(-1.4, 1.5, r"$\nabla g_1$", color=AQUA, fontsize=13); ax.text(-1.4, 1.25, r"$\nabla g_2$", color=VIOLET, fontsize=13)
+    ax.text(-0.95, 1.5, r"$\nabla f$", color=RED, fontsize=13)
 
-    def draw(x1):
+    def draw(c):
         for a in arrows:
             a.remove()
         arrows.clear()
-        gg, lam, ang = cusp_grad(x1)
-        p = np.array([x1, x1 ** (2 / 3)])
-        pt.set_data([p[0]], [p[1]])
-        for q, col in ((p + np.array([0, 0.3]), RED), (p + 0.3 * gg, AQUA)):
-            arrows.append(ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=14, color=col, lw=2, zorder=6)))
-        ax.set_title(f"$x_1={x1:.3f}$:  $\\|\\nabla g\\|={np.linalg.norm(gg):.3f}$,  угол ${ang:.0f}^\\circ$,  $\\hat\\lambda={lam:.1f}$")
-        return [pt] + arrows
+        r = np.sqrt(max(1 - c ** 2, 0.0))                      # радиус окружности пересечения
+        P = np.array([r, c])                                   # x* в координатах вида сбоку
+        plane.set_data([-1.45, 2.6], [c, c]); chord.set_data([-r, r], [c, c]); pt.set_data([P[0]], [P[1]])
+        dx = 0.0 if r > 1e-3 else 0.05                         # при касании нормали совпадают — разводим чуть-чуть
+        g = np.array([r - S5, c - 1.0])                        # grad f = x* - a
+        for p, q, col in ((P - [dx, 0], P - [dx, 0] + 0.55 * P / np.linalg.norm(P), AQUA),
+                          (P + [dx, 0], P + [dx, 0] + np.array([0, 0.55]), VIOLET), (P, P + 0.35 * g, RED)):
+            arrows.append(ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=14, color=col, lw=2.2, zorder=6)))
+        if r > 1e-3:
+            lam1 = 1 - S5 / r
+            ax.set_title(f"$c={c:.3f}$:  угол между нормалями ${np.degrees(np.arccos(c)):.0f}^\\circ$,  $\\lambda_1={lam1:.1f}$")
+        else:
+            ax.set_title("$c=1$: нормали параллельны, подходящих $\\lambda$ нет")
+        return [plane, chord, pt] + arrows
 
-    ax.annotate(r"$\nabla f$", (0.62, 0.86), color=RED); ax.annotate(r"$\nabla g$", (0.62, 0.78), color=AQUA)
     anim = FuncAnimation(fig, draw, frames=frames, blit=False)
-    path = IMG / "10_licq_breaks.gif"
+    path = IMG / "10_plane_touch.gif"
     anim.save(path, writer=PillowWriter(fps=FPS), dpi=DPI)
     plt.close(fig)
     size = path.stat().st_size
     assert size <= 2_000_000, f"{path.name}: {size / 1e6:.2f} МБ > 2 МБ"
+    assert abs((1 - S5 / np.sqrt(1 - 0.9 ** 2)) + 4.1299) < 1e-3          # то же число, что в конспекте при c = 0.9
     print(f"   {path.name}: {len(frames)} кадров, {size / 1e6:.2f} МБ")
 
 
 if __name__ == "__main__":
-    licq_breaks()
+    plane_touch()

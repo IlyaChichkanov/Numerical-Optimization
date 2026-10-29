@@ -1,8 +1,8 @@
 """Вспомогательный код демонстраций лекции 8.
 
 Окружность: A_CIRCLE = (2, 1), circle_points() -> ((x, lam) ближней, дальней точки); саму систему демо (a) пишет явно.
-Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.
-Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).
+Окружность в пространстве: A_SPACE, sphere_plane(a, c) -> (x*, grad f, J, lam, базис T) — сфера и плоскость x3 = c (§2.2, §3.1).
+IPOPT для равенств: solve_eq(x, f, g, x0) -> (x*, lam* в нашем знаке, итерации, rank J).
 Цепь на стержнях: rod_chain(N, L_total, m) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)
         в нашем знаке L = f - lam^T g; chain_xy(ch, v) -> (y, z) с опорами; chain_checks(ch, v, lam) -> невязка, rank J,
         собственные числа редуцированного гессиана, Z, натяжения F и составляющие Fh, Fv.
@@ -40,23 +40,26 @@ def circle_points(a=A_CIRCLE):
 A_SPACE = np.array([2.0, 1.0, 1.0])       # §2.2: та же окружность в пространстве, точка a поднята над плоскостью
 
 
-def sphere_plane(a=A_SPACE):
-    """Окружность как пересечение сферы g1 = 1/2(|x|^2 - 1) = 0 и плоскости g2 = x3 = 0; ближайшая к a точка.
-    Возвращает (x*, grad f, J, lam, базис касательного пространства)."""
-    xs = np.array([a[0], a[1], 0.0]) / np.hypot(a[0], a[1])   # ближайшая точка: (a1, a2) / |(a1, a2)| в плоскости x3 = 0
+def sphere_plane(a=A_SPACE, c=0.0):
+    """Сфера g1 = 1/2(|x|^2 - 1) = 0 и плоскость g2 = x3 - c = 0; ближайшая к a точка их пересечения.
+    При c < 1 пересечение — окружность радиуса sqrt(1 - c^2) (§2.2: c = 0), при c = 1 — одна точка (0, 0, 1) (§3.1).
+    Возвращает (x*, grad f, J, lam, базис T = null_space(J)); при c = 1 lam — лучшее приближение, точного нет."""
+    r = np.sqrt(max(1.0 - c ** 2, 0.0))                       # радиус окружности пересечения
+    s = np.hypot(a[0], a[1])                                   # длина горизонтальной части a
+    xs = np.array([r * a[0] / s, r * a[1] / s, c])             # ближайшая точка: над направлением (a1, a2), на высоте c
     gf = xs - a                                                # grad f для f = 1/2 |x - a|^2
     J = np.vstack([xs, [0.0, 0.0, 1.0]])                       # строки: grad g1 = x, grad g2 = e3
-    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam
+    lam = np.linalg.lstsq(J.T, gf, rcond=None)[0]              # grad f = J^T lam методом наименьших квадратов
     return xs, gf, J, lam, null_space(J)
 
 
-def cusp_grad(x1):
-    """Клюв g = x2^3 - x1^2 = 0, f = x2: в точке кривой x2 = x1^(2/3) возвращает grad g, оценку lambda, угол к grad f (град)."""
-    x2 = x1 ** (2 / 3)
-    gf, gg = np.array([0.0, 1.0]), np.array([-2 * x1, 3 * x2 ** 2])
-    lam = gf @ gg / (gg @ gg)                                  # наименьшие квадраты для grad f = lam grad g
-    ang = np.degrees(np.arccos(gf @ gg / np.linalg.norm(gg)))
-    return gg, lam, ang
+def solve_eq(x, f, g, x0):
+    """IPOPT для min f при g(x) = 0 (CasADi). Возвращает (x*, lam* в нашем знаке L = f - lam^T g, итерации, rank J)."""
+    solver = ca.nlpsol("s", "ipopt", {"x": x, "f": f, "g": g}, {"ipopt.print_level": 0, "print_time": 0, "ipopt.sb": "yes"})
+    sol = solver(x0=x0, lbg=0, ubg=0)                          # lbg = ubg = 0: ограничения — равенства
+    xs = np.array(sol["x"]).ravel()
+    J = ca.Function("J", [x], [ca.jacobian(g, x)])(xs).full()  # якобиан ограничений в ответе
+    return xs, -np.array(sol["lam_g"]).ravel(), solver.stats()["iter_count"], np.linalg.matrix_rank(J, tol=1e-6)
 
 
 def rod_chain(N=3, L_total=5.0, m=1.0, g_acc=9.81):
