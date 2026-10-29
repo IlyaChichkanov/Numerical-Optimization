@@ -8,14 +8,15 @@
 
 Картинки в порядке появления в конспекте:
   00_circle_hook       введение, задача 1: два решения условия касания — ближайшая и самая далёкая точки окружности
-  00_chain_hook        введение, задача 2: цепь на стержнях из IPOPT и натяжения у опоры и в середине
+  00_chain_hook        введение, задача 2: цепь из трёх грузов на четырёх стержнях из IPOPT и натяжения стержней
+  00_chain_forces      введение, задача 2: три силы на груз 1 и их треугольник — равновесие
   01_review            повторение: задача Л3 §6 — квадрат в круге, линия уровня касается окружности, lambda = -2
   02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
   03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
   04_cusp_licq         §3.1: клюв x2^3 = x1^2 — grad g укорачивается к острию
   05_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
   06_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
-  07_chain_rods        §5.1: натяжения стержней и постоянная горизонтальная составляющая
+  07_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
   08_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
   09_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
@@ -98,10 +99,10 @@ def cusp_grad(x1):
     return gg, lam, ang
 
 
-def rod_chain(N=40, L_total=5.0, g_acc=9.81):
-    """Цепь на стержнях: N грузов между (-2, 1) и (2, 1), N + 1 стержней длины L_total / (N + 1), f = w sum z.
-    Возвращает словарь с символьными v, f, g (CasADi), весом w, длиной стержня ell и функцией старта."""
-    m = 4.0 / N; w = m * g_acc; ell = L_total / (N + 1)
+def rod_chain(N=3, L_total=5.0, m=1.0, g_acc=9.81):
+    """Цепь на стержнях: N грузов массы m между (-2, 1) и (2, 1), N + 1 стержней длины L_total / (N + 1), f = w sum z.
+    Возвращает словарь с символьными v, f, g (CasADi), весом груза w, длиной стержня ell и стартом v0."""
+    w = m * g_acc; ell = L_total / (N + 1)
     v = ca.SX.sym("v", 2 * N)
     y = ca.vertcat(-2.0, v[:N], 2.0); z = ca.vertcat(1.0, v[N:], 1.0)
     f = w * ca.sum1(z[1:-1])
@@ -189,38 +190,49 @@ def numbers():
     fc = lambda t: 0.5 * np.sum((np.array([np.cos(t), np.sin(t)]) - A_CIRCLE) ** 2)
     for t, lam in ((th0, lmin), (th0 + np.pi, lmax)):
         assert abs((fc(t + h) - 2 * fc(t) + fc(t - h)) / h ** 2 - (1 - lam)) < 1e-5
-    # §5.1: цепь на стержнях
+    # введение и §5.1: цепь на стержнях — 3 груза по 1 кг, 4 стержня по 1.25 м
     ch = rod_chain()
     v, lam, st = solve_rod_chain(ch)
     chk = chain_checks(ch, v, lam)
     y, z = chain_xy(ch, v)
     f_star = ch["w"] * z[1:-1].sum()
-    print(f"   цепь: {st['iter_count']} итераций, f* = {f_star:.4f}, z_min = {z.min():.4f}, lam концы/середина = "
-          f"{lam[0]:.2f}/{lam[20]:.2f}, F = {chk['F'][0]:.2f}/{chk['F'][20]:.2f} Н, F_h = {chk['Fh'].mean():.3f}, "
-          f"rank J = {chk['rank']}, eig red = {chk['eig'].min():.2f}..{chk['eig'].max():.1f}, res = {chk['res']:.1e}")
-    assert st["iter_count"] == 13 and st["return_status"] == "Solve_Succeeded", st["iter_count"]
-    assert abs(f_star - 5.7564) < 1e-3 and abs(z.min() + 0.327) < 1e-3
-    assert abs(lam[0] + 97.88) < 0.05 and abs(lam[20] + 55.76) < 0.05
-    assert abs(chk["F"][0] - 23.87) < 0.02 and abs(chk["F"][20] - 13.60) < 0.02
-    assert np.ptp(chk["Fh"]) < 1e-6 and abs(abs(chk["Fh"].mean()) - 13.60) < 0.02       # горизонтальная одинакова
-    assert abs(abs(chk["Fv"][0]) - 19.62) < 0.02 and abs(ch["w"] * ch["N"] - 39.24) < 1e-6   # половина веса
-    assert chk["res"] < 1e-9 and chk["rank"] == 41 and chk["Z"].shape == (80, 39)
-    assert chk["eig"].min() > 2.1 and 650 < chk["eig"].max() < 700, (chk["eig"].min(), chk["eig"].max())
-    # цена длины стержней (упражнение 8.4, демо (e)): +1 %
-    ch2 = rod_chain(L_total=5.05)
-    v2, _, _ = solve_rod_chain(ch2, v0=v)
-    f2 = ch2["w"] * chain_xy(ch2, v2)[1][1:-1].sum()
-    f_pred = f_star + lam.sum() * (ch2["ell"] ** 2 - ch["ell"] ** 2)
-    assert abs(f2 - 4.886) < 1e-3 and abs(f_pred - 4.873) < 1e-3, (f2, f_pred)
+    print(f"   цепь: {st['iter_count']} итераций, f* = {f_star:.4f}, z_min = {z.min():.4f}, lam = {lam.round(4)}, "
+          f"F = {chk['F'].round(3)} Н, F_h = {chk['Fh'].round(3)}, F_v = {chk['Fv'].round(3)}, "
+          f"rank J = {chk['rank']}, eig red = {chk['eig'].round(3)}, res = {chk['res']:.1e}")
+    assert abs(ch["ell"] - 1.25) < 1e-12 and abs(ch["w"] - 9.81) < 1e-12
+    assert st["iter_count"] == 5 and st["return_status"] == "Solve_Succeeded", st["iter_count"]
+    assert abs(f_star + 2.3936) < 1e-3 and abs(z.min() + 0.3743) < 1e-3
+    assert np.allclose(lam, [-7.8703, -5.5808, -5.5808, -7.8703], atol=2e-3)
+    assert np.allclose(chk["F"], [19.676, 13.952, 13.952, 19.676], atol=2e-3)           # натяжения 19.7 и 14.0 Н
+    assert np.ptp(chk["Fh"]) < 1e-6 and abs(abs(chk["Fh"].mean()) - 13.061) < 2e-3      # горизонтальная одинакова
+    assert np.allclose(chk["Fv"], [14.715, 4.905, -4.905, -14.715], atol=2e-3)          # 1.5 w и 0.5 w
+    assert abs(chk["Fv"][0] - chk["Fv"][-1] - ch["w"] * ch["N"]) < 1e-6                # опоры держат вес цепи 3w
+    assert chk["res"] < 1e-9 and chk["rank"] == 4 and chk["Z"].shape == (6, 2)
+    assert np.allclose(chk["eig"], [18.99, 35.21], atol=0.01), chk["eig"]
+    # введение: равновесие груза 1 — вес и силы стержней 0 и 1 в сумме дают ноль
+    p0, p1, p2 = (np.array([y[i], z[i]]) for i in range(3))
+    rod0, rod1, weight = 2 * lam[0] * (p1 - p0), 2 * lam[1] * (p1 - p2), np.array([0.0, -ch["w"]])
+    assert np.allclose(rod0, [-13.061, 14.715], atol=2e-3) and np.allclose(rod1, [13.061, -4.905], atol=2e-3)
+    assert np.linalg.norm(weight + rod0 + rod1) < 1e-9
+    # цена длины стержней (упражнение 8.4, демо (e)): +1 % и +5 %
+    for k, f_exp, pred_exp in ((1.01, -3.2260, -3.2385), (1.05, -6.4084, -6.7022)):
+        ch2 = rod_chain(L_total=5.0 * k)
+        v2, _, _ = solve_rod_chain(ch2, v0=v)
+        f2 = ch2["w"] * chain_xy(ch2, v2)[1][1:-1].sum()
+        f_pred = f_star + lam.sum() * (ch2["ell"] ** 2 - ch["ell"] ** 2)
+        assert abs(f2 - f_exp) < 1e-3 and abs(f_pred - pred_exp) < 1e-3, (k, f2, f_pred)
     # §5.2: портфель
     x, fs, lam_pf = portfolio_eq(0.10)
     assert np.allclose(x, [0.0946, 0.3822, 0.3209, 0.2023], atol=2e-4) and abs(fs - 0.008204) < 1e-6
     assert abs(lam_pf[1] - 0.2571) < 1e-4 and abs(lam_pf[0] + 0.0093) < 1e-4, lam_pf
     d = 1e-5
     assert abs((portfolio_eq(0.10 + d)[1] - portfolio_eq(0.10 - d)[1]) / (2 * d) - lam_pf[1]) < 1e-6
-    # §6: лог IPOPT — inf_pr падает примерно вчетверо за итерацию, inf_du держится 2.5–6 с 4-й по 9-ю итерацию
+    # §6: лог IPOPT — в конце число верных знаков обеих невязок примерно удваивается за итерацию
     it = st["iterations"]; pr, du = np.array(it["inf_pr"]), np.array(it["inf_du"])
-    assert np.all((pr[1:8] / pr[2:9] > 3.5)) and np.all((du[4:10] > 2.5) & (du[4:10] < 6)) and du[-1] < 1e-12, (pr, du)
+    print(f"   лог: inf_pr = {np.array2string(pr, precision=1)}, inf_du = {np.array2string(du, precision=1)}")
+    lpr, ldu = np.log10(pr[3:]), np.log10(du[3:])
+    assert np.all(lpr[1:] / lpr[:-1] > 1.7) and np.all(ldu[1:] / ldu[:-1] > 1.7), (pr, du)
+    assert 1e-4 < pr[3] < 1e-3 and 1e-7 < pr[4] < 1e-6 and 1e-13 < pr[5] < 1e-12 and du[-1] < 1e-11, (pr, du)
     return ch, v, lam, st, chk
 
 
@@ -260,22 +272,65 @@ def fig_circle_hook():
 
 def fig_chain_hook(ch, v, chk):
     y, z = chain_xy(ch, v)
-    fig, ax = plt.subplots(figsize=(8.8, 4.4))
-    ax.plot(y, z, "-", color=INK, lw=1.3); ax.plot(y[1:-1], z[1:-1], "o", color=BLUE, ms=4.5, zorder=5)
-    ax.plot([-2, 2], [1, 1], "s", color=INK, ms=8, zorder=6)
-    for j, off in ((0, (10, -6)), (20, (10, -20))):
-        if j == 0:                                                     # стержень 0 тянет опору к цепи
-            p = np.array([y[0], z[0]]); d = np.array([y[1] - y[0], z[1] - z[0]])
-        else:                                                          # стержень 20 тянет груз 21 к грузу 20
-            p = np.array([y[j + 1], z[j + 1]]); d = np.array([y[j] - y[j + 1], z[j] - z[j + 1]])
-        d /= np.linalg.norm(d)
-        q = p + 0.025 * chk["F"][j] * d
-        arrow(ax, p, q, ORANGE, lw=2.6, ms=16)
-        ax.annotate(f"{chk['F'][j]:.1f} Н", q, off, textcoords="offset points", color=ORANGE, fontsize=13, fontweight="bold")
-    ax.text(0, 1.25, "40 грузов, 41 стержень; стрелки — натяжения", ha="center", fontsize=11, color=GRAY)
-    ax.set_aspect("equal"); ax.set_xlim(-2.6, 2.6); ax.set_ylim(-0.75, 1.45)
-    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Цепь на стержнях: ответ IPOPT")
+    fig, ax = plt.subplots(figsize=(8.8, 4.6))
+    ax.plot(y, z, "-", color=INK, lw=2.2, zorder=3)                                   # стержни
+    ax.plot([y[0], y[-1]], [z[0], z[-1]], "s", color=INK, ms=10, zorder=6)            # опоры
+    ax.plot(y[1:-1], z[1:-1], "o", color=BLUE, ms=13, zorder=7)                       # грузы
+    for i in (1, 2, 3):
+        ax.annotate(f"груз {i}", (y[i], z[i]), (0, -26), textcoords="offset points", ha="center", color=BLUE, fontsize=12)
+    for i, dx in ((0, -8), (4, 8)):
+        ax.annotate(f"опора {i}", (y[i], z[i]), (dx, 10), textcoords="offset points", ha="right" if i == 0 else "left",
+                    color=INK, fontsize=11)
+    for j in range(4):                                                                 # подпись у середины стержня, внутри цепи
+        mid = np.array([(y[j] + y[j + 1]) / 2, (z[j] + z[j + 1]) / 2])
+        d = np.array([y[j + 1] - y[j], z[j + 1] - z[j]])
+        nrm = np.array([-d[1], d[0]]) / np.linalg.norm(d)
+        nrm = nrm if nrm[1] > 0 else -nrm
+        ax.annotate(f"стержень {j}\n{chk['F'][j]:.1f} Н", mid, tuple(30 * nrm), textcoords="offset points",
+                    ha="center", va="center", color=ORANGE, fontsize=11, fontweight="bold")
+    ax.text(0, 1.32, r"стержни по $\ell=1.25$ м, грузы по 1 кг; числа — натяжения $2|\lambda_j|\ell$",
+            ha="center", fontsize=11, color=GRAY)
+    ax.set_aspect("equal"); ax.set_xlim(-2.7, 2.7); ax.set_ylim(-0.85, 1.5)
+    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Ответ IPOPT: три груза, четыре стержня")
     save("00_chain_hook.png")
+
+
+def fig_chain_forces(ch, v, lam):
+    y, z = chain_xy(ch, v)
+    p0, p1, p2 = (np.array([y[i], z[i]]) for i in range(3))
+    weight = np.array([0.0, -ch["w"]])                                                # вес = -grad f по грузу 1
+    rod0, rod1 = 2 * lam[0] * (p1 - p0), 2 * lam[1] * (p1 - p2)                        # силы стержней 0 и 1 на груз 1
+    forces = ((weight, BLUE, "вес"), (rod0, ORANGE, "стержень 0"), (rod1, VIOLET, "стержень 1"))
+    fig, (ax, bx) = plt.subplots(1, 2, figsize=(9.0, 4.4), gridspec_kw=dict(width_ratios=[1.15, 1]))
+    # слева: груз 1, его стержни и три силы
+    ax.plot(y[:4], z[:4], "-", color=GRAY, lw=1.6, zorder=2)
+    ax.plot(*p0, "s", color=INK, ms=9, zorder=6); ax.plot(y[1:4], z[1:4], "o", color=BLUE, ms=11, zorder=7)
+    ax.annotate("опора 0", p0, (6, 8), textcoords="offset points", fontsize=10, color=INK)
+    ax.annotate("груз 1", p1, (-52, -4), textcoords="offset points", fontsize=11, color=BLUE)
+    ax.annotate("груз 2", p2, (0, -22), textcoords="offset points", ha="center", fontsize=11, color=BLUE)
+    s_ = 0.035                                                                         # метров на ньютон
+    offs = {"вес": (6, -6), "стержень 0": (10, -2), "стержень 1": (4, 10)}                   # подписи — в пустом месте
+    for F, col, name in forces:
+        arrow(ax, p1, p1 + s_ * F, col, lw=2.6, ms=16)
+        ax.annotate(f"{name}\n{np.linalg.norm(F):.1f} Н", p1 + s_ * F, offs[name], textcoords="offset points",
+                    color=col, fontsize=11, fontweight="bold", ha="left")
+    ax.set_aspect("equal"); ax.set_xlim(-2.3, 0.45); ax.set_ylim(-0.75, 1.25)
+    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Три силы на груз 1")
+    # справа: те же силы одна за другой — треугольник замыкается
+    q = np.zeros(2)
+    for F, col, name in (forces[0], forces[2], forces[1]):
+        arrow(bx, q, q + F, col, lw=2.6, ms=16)
+        mid = q + F / 2
+        off = {"вес": (-10, 0), "стержень 1": (-20, -30), "стержень 0": (10, 6)}[name]        # снаружи треугольника
+        bx.annotate(f"{name}\n{np.linalg.norm(F):.1f} Н", mid, off, textcoords="offset points", color=col, fontsize=11,
+                    fontweight="bold", ha={"вес": "right", "стержень 1": "center", "стержень 0": "left"}[name], va="center")
+        q = q + F
+    assert np.linalg.norm(q) < 1e-9                                                    # треугольник замкнулся
+    bx.plot(0, 0, "o", color=INK, ms=6, zorder=7)
+    bx.annotate("начало = конец:\nсумма $=0$", (0, 0), (10, 2), textcoords="offset points", fontsize=11, color=INK, va="bottom")
+    bx.set_aspect("equal"); bx.set_xlim(-9, 19); bx.set_ylim(-19.5, 5.5)
+    bx.set_xlabel("Н"); bx.set_ylabel("Н"); bx.set_title("Сложим их по очереди")
+    save("00_chain_forces.png")
 
 
 def fig_review():
@@ -423,14 +478,17 @@ def fig_circle_cut():
 
 
 def fig_chain_rods(chk):
-    fig, ax = plt.subplots(figsize=(7.8, 3.8))
-    j = np.arange(len(chk["F"]))
-    ax.plot(j, chk["F"], "o-", color=ORANGE, ms=3.5, label="натяжение $F_j$")
-    ax.plot(j, np.abs(chk["Fh"]), "-", color=AQUA, lw=2.6, label=f"горизонтальная составляющая: {abs(chk['Fh'].mean()):.1f} Н")
-    ax.text(2.0, 25.0, f"{chk['F'][0]:.1f} Н у опоры", color=ORANGE, fontsize=11)
-    ax.annotate(f"{chk['F'][20]:.1f} Н в середине", (20, chk["F"][20]), (-40, 14), textcoords="offset points", color=ORANGE, fontsize=11)
-    ax.set_xlabel("номер стержня $j$"); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 27); ax.set_title("Натяжения стержней")
-    ax.legend(loc="lower center", fontsize=11)
+    fig, ax = plt.subplots(figsize=(7.8, 4.0))
+    j = np.arange(len(chk["F"])); wd = 0.26
+    bars = ((-wd, chk["F"], ORANGE, r"натяжение $2|\lambda_j|\ell$"),
+            (0.0, np.abs(chk["Fh"]), AQUA, "горизонтальная"),
+            (wd, np.abs(chk["Fv"]), VIOLET, "вертикальная"))
+    for dx, val, col, lab in bars:
+        b = ax.bar(j + dx, val, wd, color=col, label=lab)
+        ax.bar_label(b, fmt="%.1f", fontsize=10, padding=2)
+    ax.set_xticks(j, [f"стержень {k}" for k in j]); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 31)
+    ax.set_title("Горизонтальная составляющая везде одна"); ax.grid(axis="x", visible=False)
+    ax.legend(loc="upper center", ncol=3, fontsize=10)
     save("07_chain_rods.png")
 
 
@@ -466,6 +524,7 @@ if __name__ == "__main__":
     print("картинки:")
     fig_circle_hook()
     fig_chain_hook(ch, v, chk)
+    fig_chain_forces(ch, v, lam)
     fig_review()
     fig_circle_tangent()
     fig_sphere_plane()

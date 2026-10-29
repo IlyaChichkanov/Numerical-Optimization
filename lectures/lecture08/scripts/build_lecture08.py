@@ -76,7 +76,7 @@ def main() -> None:
         'Окружность: A_CIRCLE = (2, 1), circle_points() -> ((x, lam) ближней, дальней точки); саму систему демо (a) пишет явно.\n'
         'Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.\n'
         'Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).\n'
-        'Цепь на стержнях: rod_chain(N, L_total) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)\n'
+        'Цепь на стержнях: rod_chain(N, L_total, m) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)\n'
         '        в нашем знаке L = f - lam^T g; chain_xy(ch, v) -> (y, z) с опорами; chain_checks(ch, v, lam) -> невязка, rank J,\n'
         '        собственные числа редуцированного гессиана, Z, натяжения F и составляющие Fh, Fv.\n'
         'Портфель: PF_R, PF_SIGMA, portfolio_eq(rho) -> (x, f*, lam) — два равенства, система ККТ линейна.\n'

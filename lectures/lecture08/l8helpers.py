@@ -3,7 +3,7 @@
 Окружность: A_CIRCLE = (2, 1), circle_points() -> ((x, lam) ближней, дальней точки); саму систему демо (a) пишет явно.
 Окружность в пространстве: A_SPACE, sphere_plane() -> (x*, grad f, J, lam, базис T) — два ограничения, сфера и плоскость.
 Клюв: cusp_grad(x1) -> (grad g, оценка lambda, угол к grad f) на кривой x2 = x1^(2/3).
-Цепь на стержнях: rod_chain(N, L_total) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)
+Цепь на стержнях: rod_chain(N, L_total, m) -> словарь (v, f, g — CasADi; w, ell, N, v0); solve_rod_chain(ch, v0) -> (v*, lam*, stats)
         в нашем знаке L = f - lam^T g; chain_xy(ch, v) -> (y, z) с опорами; chain_checks(ch, v, lam) -> невязка, rank J,
         собственные числа редуцированного гессиана, Z, натяжения F и составляющие Fh, Fv.
 Портфель: PF_R, PF_SIGMA, portfolio_eq(rho) -> (x, f*, lam) — два равенства, система ККТ линейна.
@@ -59,10 +59,10 @@ def cusp_grad(x1):
     return gg, lam, ang
 
 
-def rod_chain(N=40, L_total=5.0, g_acc=9.81):
-    """Цепь на стержнях: N грузов между (-2, 1) и (2, 1), N + 1 стержней длины L_total / (N + 1), f = w sum z.
-    Возвращает словарь с символьными v, f, g (CasADi), весом w, длиной стержня ell и функцией старта."""
-    m = 4.0 / N; w = m * g_acc; ell = L_total / (N + 1)
+def rod_chain(N=3, L_total=5.0, m=1.0, g_acc=9.81):
+    """Цепь на стержнях: N грузов массы m между (-2, 1) и (2, 1), N + 1 стержней длины L_total / (N + 1), f = w sum z.
+    Возвращает словарь с символьными v, f, g (CasADi), весом груза w, длиной стержня ell и стартом v0."""
+    w = m * g_acc; ell = L_total / (N + 1)
     v = ca.SX.sym("v", 2 * N)
     y = ca.vertcat(-2.0, v[:N], 2.0); z = ca.vertcat(1.0, v[N:], 1.0)
     f = w * ca.sum1(z[1:-1])
