@@ -206,6 +206,16 @@ def numbers():
     fc = lambda t: 0.5 * np.sum((np.array([np.cos(t), np.sin(t)]) - A_CIRCLE) ** 2)
     for t, lam in ((th0, lmin), (th0 + np.pi, lmax)):
         assert abs((fc(t + h) - 2 * fc(t) + fc(t - h)) / h ** 2 - (1 - lam)) < 1e-5
+    # §3.3: окружность задачи 1 тремя записями — точка одна, множители разные
+    y = ca.SX.sym("y", 2); fy = 0.5 * ca.sumsqr(y - ca.DM(A_CIRCLE)); gy = 0.5 * (ca.sumsqr(y) - 1)
+    for g, x0, it_exp, rk_exp, lam_lo, lam_hi in ((gy, [1.0, 0.5], 3, 1, [-1.2362], [-1.2360]),
+                                                  (ca.vertcat(gy, gy), [1.0, 0.5], 3, 1, [-2.0001, 0.7638], [-1.9999, 0.7640]),
+                                                  ((ca.sumsqr(y) - 1) ** 2, [1.0, 0.5], 33, 0, [-6.8e9], [-6.6e9]),
+                                                  ((ca.sumsqr(y) - 1) ** 2, [0.5, 0.2], 33, 0, [3.9e9], [4.0e9])):
+        ys, lam_y, it, rk = solve_eq(y, fy, g, x0)
+        print(f"   окружность, старт {x0}: {it} итераций, rank J = {rk}, lam = {lam_y}")
+        assert np.allclose(ys, xmin, atol=1e-6) and it == it_exp and rk == rk_exp, (it, rk, lam_y)
+        assert np.all(np.array(lam_lo) < lam_y) and np.all(lam_y < np.array(lam_hi)), lam_y
     # введение и §5.1: цепь на стержнях — 3 груза по 1 кг, 4 стержня по 1.25 м
     ch = rod_chain()
     v, lam, st = solve_rod_chain(ch)
