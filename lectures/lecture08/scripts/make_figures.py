@@ -13,12 +13,13 @@
   02_circle_tangent    §2.1: касательная часть grad f — в точке (0.5, 0.866) она есть, в минимуме её нет
   03_sphere_plane      §2.2: окружность = сфера ∩ плоскость, grad f = lambda1 grad g1 + lambda2 grad g2
   04_sphere_touch      §3.1: плоскость x3 = c касается сферы — вид сбоку при c = 0.6 и c = 1, нормали становятся параллельными
-  05_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
-  06_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
-  07_chain_forces      §5.1: три силы на груз 1 и их треугольник — равновесие
-  08_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
-  09_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
-  10_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
+  05_sphere_cylinder   §3.2: та же окружность как сфера ∩ плоскость (rank J = 2) и как сфера ∩ цилиндр (rank J = 1) — вид сбоку
+  06_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
+  07_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
+  08_chain_forces      §5.1: три силы на груз 1 и их треугольник — равновесие
+  09_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
+  10_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
+  11_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
 
 from pathlib import Path
@@ -206,16 +207,18 @@ def numbers():
     fc = lambda t: 0.5 * np.sum((np.array([np.cos(t), np.sin(t)]) - A_CIRCLE) ** 2)
     for t, lam in ((th0, lmin), (th0 + np.pi, lmax)):
         assert abs((fc(t + h) - 2 * fc(t) + fc(t - h)) / h ** 2 - (1 - lam)) < 1e-5
-    # §3.3: окружность задачи 1 тремя записями — точка одна, множители разные
-    y = ca.SX.sym("y", 2); fy = 0.5 * ca.sumsqr(y - ca.DM(A_CIRCLE)); gy = 0.5 * (ca.sumsqr(y) - 1)
-    for g, x0, it_exp, rk_exp, lam_lo, lam_hi in ((gy, [1.0, 0.5], 3, 1, [-1.2362], [-1.2360]),
-                                                  (ca.vertcat(gy, gy), [1.0, 0.5], 3, 1, [-2.0001, 0.7638], [-1.9999, 0.7640]),
-                                                  ((ca.sumsqr(y) - 1) ** 2, [1.0, 0.5], 33, 0, [-6.8e9], [-6.6e9]),
-                                                  ((ca.sumsqr(y) - 1) ** 2, [0.5, 0.2], 33, 0, [3.9e9], [4.0e9])):
-        ys, lam_y, it, rk = solve_eq(y, fy, g, x0)
-        print(f"   окружность, старт {x0}: {it} итераций, rank J = {rk}, lam = {lam_y}")
-        assert np.allclose(ys, xmin, atol=1e-6) and it == it_exp and rk == rk_exp, (it, rk, lam_y)
-        assert np.all(np.array(lam_lo) < lam_y) and np.all(lam_y < np.array(lam_hi)), lam_y
+    # §3.2: окружность §2.2 двумя записями — сфера и плоскость x3 = 0 (LICQ) или сфера и цилиндр (строки J совпадают)
+    sph = 0.5 * (ca.sumsqr(x3) - 1)
+    cyl = 0.5 * (x3[0] ** 2 + x3[1] ** 2 - 1)
+    for g, it_exp, rk_exp in ((ca.vertcat(sph, x3[2]), 3, 2), (ca.vertcat(sph, cyl), 29, 1)):
+        xs_i, lam_i, it, rk = solve_eq(x3, f3, g, [1.0, 0.5, 0.0])
+        J_i = ca.Function("J", [x3], [ca.jacobian(g, x3)])(xs_i).full()
+        print(f"   окружность §2.2, rank J = {rk}: {it} итераций IPOPT, lam = {lam_i}, J = {J_i.round(3).tolist()}")
+        assert np.allclose(xs_i, xs, atol=1e-6) and it == it_exp and rk == rk_exp, (it, rk, lam_i)
+        if rk == 2:
+            assert np.allclose(lam_i, [-1.2361, -1.0], atol=1e-4) and np.allclose(J_i, [[0.8944, 0.4472, 0], [0, 0, 1]], atol=1e-4)
+        else:                                                  # множители — порядка 10^8, противоположных знаков
+            assert 1e8 < np.abs(lam_i).min() < 1e9 and lam_i[0] < 0 < lam_i[1] and np.allclose(J_i[0], J_i[1], atol=1e-6)
     # введение и §5.1: цепь на стержнях — 3 груза по 1 кг, 4 стержня по 1.25 м
     ch = rod_chain()
     v, lam, st = solve_rod_chain(ch)
@@ -357,7 +360,7 @@ def fig_chain_forces(ch, v, lam):
     bx.annotate("начало = конец:\nсумма $=0$", (0, 0), (10, 2), textcoords="offset points", fontsize=11, color=INK, va="bottom")
     bx.set_aspect("equal"); bx.set_xlim(-9, 19); bx.set_ylim(-19.5, 5.5)
     bx.set_xlabel("Н"); bx.set_ylabel("Н"); bx.set_title("Сложим их по очереди")
-    save("07_chain_forces.png")
+    save("08_chain_forces.png")
 
 
 def fig_review():
@@ -497,6 +500,43 @@ def fig_sphere_touch():
     save("04_sphere_touch.png")
 
 
+def fig_sphere_cylinder():
+    """§3.2, вид сбоку как в 04: окружность §2.2 (x* = (1, 0) в этих координатах) — двумя записями."""
+    P, A = np.array([1.0, 0.0]), np.array([np.sqrt(5), 1.0])  # x* и a в координатах вида сбоку
+    g = P - A                                                  # grad f = x* - a = (1 - sqrt5, -1)
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.5), sharey=True)
+    for ax in axes:
+        unit_circle(ax, lw=2)                                  # сфера
+        ax.plot(*A, "o", color=INK, ms=6); ax.annotate("$a$", A, (5, 5), textcoords="offset points", fontsize=12)
+        arrow(ax, P, P + 0.35 * g, RED, lw=2.4)
+        ax.plot(*P, "o", color=RED, ms=8, zorder=8)
+        ax.annotate(r"$\nabla f$", P + 0.35 * g, (-30, -8), textcoords="offset points", color=RED, fontsize=13)
+    ax = axes[0]                                               # сфера и плоскость x3 = 0
+    ax.plot([-1.45, 2.55], [0, 0], color=GRAY, lw=2)
+    ax.text(1.75, -0.18, "плоскость", color=GRAY, fontsize=11, ha="center")
+    arrow(ax, P, P + [0.55, 0], AQUA, lw=2.4); arrow(ax, P, P + [0, 0.55], VIOLET, lw=2.4)
+    ax.annotate(r"$\nabla g_1$", P + [0.55, 0], (2, 5), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.annotate(r"$\nabla g_2$", P + [0, 0.55], (-44, -8), textcoords="offset points", color=VIOLET, fontsize=13)
+    for p, q in ((P + 0.35 * g * [1, 0], P + 0.35 * g), (P + 0.35 * g * [0, 1], P + 0.35 * g)):   # grad f = сумма двух нормалей
+        ax.plot(*np.c_[p, q], ":", color=GRAY, lw=1.2)
+    ax.set_title("Сфера и плоскость: ранг 2")
+    ax = axes[1]                                               # сфера и цилиндр x1^2 + x2^2 = 1: две вертикальные прямые
+    for r in (-1.0, 1.0):
+        ax.plot([r, r], [-1.15, 1.75], color=GRAY, lw=2)
+    ax.text(1.06, 1.45, "цилиндр", color=GRAY, fontsize=11)
+    arrow(ax, P + [0, 0.04], P + [0.55, 0.04], AQUA, lw=2.4); arrow(ax, P - [0, 0.04], P + [0.55, -0.04], VIOLET, lw=2.4)
+    ax.annotate(r"$\nabla g_1$", P + [0.55, 0.04], (4, 2), textcoords="offset points", color=AQUA, fontsize=13)
+    ax.annotate(r"$\nabla g_2$", P + [0.55, -0.04], (4, -16), textcoords="offset points", color=VIOLET, fontsize=13)
+    ax.plot(*np.c_[P + 0.35 * g * [1, 0], P + 0.35 * g], ":", color=RED, lw=1.6)   # вертикальная часть grad f
+    ax.text(-0.1, -0.62, "вертикальную часть\n$\\nabla f$ нечем уравновесить", color=RED, fontsize=10, ha="center", va="top")
+    ax.set_title("Сфера и цилиндр: ранг 1")
+    for ax in axes:
+        ax.set_aspect("equal"); ax.set_xlim(-1.45, 2.7); ax.set_ylim(-1.15, 1.75)
+        ax.set_xlabel("вдоль $(a_1,a_2)$")
+    axes[0].set_ylabel("$x_3$")
+    save("05_sphere_cylinder.png")
+
+
 def fig_parabola_curvature():
     fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.3), sharey=True)
     x1 = np.linspace(-1.1, 1.1, 300)
@@ -510,7 +550,7 @@ def fig_parabola_curvature():
         ax.set_xlim(-1.1, 1.1); ax.set_ylim(-1.1, 1.1); ax.set_xlabel("$x_1$"); ax.legend(loc="lower left" if c > 0 else "upper left", fontsize=11)
         ax.set_title("$c=1$: парабола вверх" if c > 0 else "$c=-1$: парабола вниз")
     axes[0].set_ylabel("$x_2$")
-    save("05_parabola_curvature.png")
+    save("06_parabola_curvature.png")
 
 
 def fig_circle_cut():
@@ -530,7 +570,7 @@ def fig_circle_cut():
     ax.set_xlim(-np.pi, np.pi); ax.set_ylim(0, 6.4)
     ax.set_xlabel(r"угол $\theta$ точки на окружности, рад"); ax.set_ylabel("$f$"); ax.set_title("$f$ вдоль окружности")
     ax.legend(loc="upper right", fontsize=10)
-    save("06_circle_cut.png")
+    save("07_circle_cut.png")
 
 
 def fig_chain_rods(chk):
@@ -545,7 +585,7 @@ def fig_chain_rods(chk):
     ax.set_xticks(j, [f"стержень {k}" for k in j]); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 31)
     ax.set_title("Горизонтальная составляющая везде одна"); ax.grid(axis="x", visible=False)
     ax.legend(loc="upper center", ncol=3, fontsize=10)
-    save("08_chain_rods.png")
+    save("09_chain_rods.png")
 
 
 def fig_portfolio_price():
@@ -558,7 +598,7 @@ def fig_portfolio_price():
     ax.plot(10, f0, "o", color=RED, ms=8, zorder=7)
     ax.set_xlabel(r"цель доходности $\rho$, %"); ax.set_ylabel(r"риск $\frac{1}{2}x^\top\Sigma x$")
     ax.set_title("Цена доходности — наклон $f^\\ast$"); ax.set_ylim(0, 0.025); ax.legend(fontsize=11, loc="upper left")
-    save("09_portfolio_price.png")
+    save("10_portfolio_price.png")
 
 
 def fig_ipopt_residuals(st):
@@ -571,7 +611,7 @@ def fig_ipopt_residuals(st):
     ax.axhline(1e-8, color=GRAY, ls="--", lw=1); ax.annotate("tol $=10^{-8}$", (0.3, 2e-8), color=GRAY, fontsize=10)
     ax.set_xlabel("итерация IPOPT"); ax.set_ylabel("невязка"); ax.set_title(f"Две невязки IPOPT: {len(pr) - 1} итераций")
     ax.set_ylim(1e-17, 1e4); ax.legend(fontsize=10, loc="lower left")
-    save("10_ipopt_residuals.png")
+    save("11_ipopt_residuals.png")
 
 
 if __name__ == "__main__":
@@ -584,6 +624,7 @@ if __name__ == "__main__":
     fig_circle_tangent()
     fig_sphere_plane()
     fig_sphere_touch()
+    fig_sphere_cylinder()
     fig_parabola_curvature()
     fig_circle_cut()
     fig_chain_forces(ch, v, lam)

@@ -2,7 +2,7 @@
 
 Запуск:  uv run python lectures/lecture08/scripts/make_animations.py
 
-  11_plane_touch.gif   плоскость x3 = c поднимается к верху сферы (§3.1, вид сбоку): окружность пересечения сжимается
+  12_plane_touch.gif   плоскость x3 = c поднимается к верху сферы (§3.1, вид сбоку): окружность пересечения сжимается
                        в точку, угол между нормалями уходит в ноль, lambda_1 = 1 - sqrt5 / sqrt(1 - c^2) — в минус
                        бесконечность; числа те же, что в make_figures.py (sphere_plane)
 """
@@ -62,7 +62,7 @@ def plane_touch():
         return [plane, chord, pt] + arrows
 
     anim = FuncAnimation(fig, draw, frames=frames, blit=False)
-    path = IMG / "11_plane_touch.gif"
+    path = IMG / "12_plane_touch.gif"
     anim.save(path, writer=PillowWriter(fps=FPS), dpi=DPI)
     plt.close(fig)
     size = path.stat().st_size
