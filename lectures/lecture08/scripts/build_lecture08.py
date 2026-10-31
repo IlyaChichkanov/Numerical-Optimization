@@ -3,13 +3,13 @@
     uv run --group casadi python lectures/lecture08/scripts/build_lecture08.py
     uv run --group casadi jupyter nbconvert --to notebook --execute --inplace lectures/lecture08/lecture08.ipynb
 
-Текст режется на ячейки так же, как в tools/md2nb.py (по заголовкам ## и ###).
-Ячейки демонстраций берутся из build_demo08.py (тот же код, что в demo08.ipynb)
-и вставляются в разделы, к которым относятся:
+Текст режется на ячейки так же, как в tools/md2nb.py (по заголовкам ## и ###) и идёт подряд, без кода.
+Ячейки демонстраций берутся из build_demo08.py (тот же код, что в demo08.ipynb) и собраны в конце,
+в разделе «## Демо», после вопросов для самопроверки:
 
-    (a) условие первого порядка: окружность на плоскости и в пространстве   -> после раздела 2, перед 3
-    (b) LICQ: плоскость касается сферы, запись ограничений                  -> после раздела 3, перед 4
-    (c) цепь на стержнях в IPOPT: три проверки и силы                        -> после раздела 5, перед 6
+    (a) условие первого порядка: окружность на плоскости и в пространстве   -> к разделу 2
+    (b) LICQ: плоскость касается сферы, сфера и цилиндр                     -> к разделу 3
+    (c) цепь на стержнях в IPOPT: три проверки и силы                        -> к разделу 5
 
 Части (0) и (e) остаются только в demo08.ipynb. Заголовки частей «## (a) …» становятся
 «### Демо (a). …», чтобы не ломать нумерацию разделов конспекта. Вторая ячейка demo08
@@ -33,12 +33,7 @@ import build_demo08  # noqa: E402  (импорт собирает список �
 MD = LECTURE / "lecture08.md"
 OUT = LECTURE / "lecture08.ipynb"
 
-# где вставлять какую часть: часть -> префикс заголовка ячейки конспекта, ПЕРЕД которой она идёт
-PLACEMENT = [
-    ("a", "## 3."),
-    ("b", "## 4."),
-    ("c", "## 6."),
-]
+DEMOS = ("a", "b", "c")                           # части демо в конце ноутбука, по порядку разделов
 PART_HEAD = re.compile(r"^## \((\w)\) (.*)$", re.M)
 
 
@@ -88,23 +83,26 @@ def main() -> None:
 
     out: list[nbf.NotebookNode] = []
     for i, src in enumerate(text_cells):
-        if i == 1:  # после шапки конспекта — короткая ячейка с импортом
+        if i == 1:  # после шапки конспекта — где код
             out.append(nbf.v4.new_markdown_cell(
-                "> **Код в этом ноутбуке.** Три демо из [`demo08.ipynb`](demo08.ipynb) стоят после своих разделов. "
-                "«Демо (a)» — условие первого порядка — после §2. «Демо (b)» — LICQ — после §3. "
-                "«Демо (c)» — цепь на стержнях в IPOPT — после §5. Числа введения и подробности — только в `demo08.ipynb`. "
-                "Вспомогательный код вынесен в [`l8helpers.py`](l8helpers.py), его подключает ячейка ниже. "
+                "> **Код в этом ноутбуке.** Текст лекции идёт подряд, без кода. Три демо из [`demo08.ipynb`](demo08.ipynb) "
+                "собраны в конце, в разделе «Демо»: (a) к §2 — условие первого порядка, (b) к §3 — LICQ, "
+                "(c) к §5 — цепь на стержнях в IPOPT. Числа введения и подробности — только в `demo08.ipynb`. "
                 "Нужен CasADi: `uv run --group casadi jupyter lab`, в Colab он ставится сам."
             ))
-            out.append(nbf.v4.new_code_cell(
-                "%matplotlib inline\n\nfrom l8helpers import *  # палитра, окружность, сфера и плоскость, цепь на стержнях, портфель (см. файл рядом)"
-            ))
-        for part, prefix in PLACEMENT:
-            if src.startswith(prefix):
-                out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"
-                           else nbf.v4.new_markdown_cell(c.source) for c in parts.pop(part))
         out.append(nbf.v4.new_markdown_cell(src))
-    assert not set(parts) & {part for part, _ in PLACEMENT}, f"не вставлены части {sorted(parts)}"
+
+    # все демо — в конце, после вопросов для самопроверки
+    out.append(nbf.v4.new_markdown_cell(
+        "## Демо\n\nТри демо к разделам лекции: (a) к §2, (b) к §3, (c) к §5. "
+        "Ячейка ниже подключает вспомогательный код из [`l8helpers.py`](l8helpers.py): палитру, задачи и `solve_eq`."
+    ))
+    out.append(nbf.v4.new_code_cell(
+        "%matplotlib inline\n\nfrom l8helpers import *  # палитра, окружность, сфера и плоскость, цепь на стержнях, портфель (см. файл рядом)"
+    ))
+    for part in DEMOS:
+        out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"
+                   else nbf.v4.new_markdown_cell(c.source) for c in parts.pop(part))
 
     nb = nbf.v4.new_notebook(cells=out)
     nb.metadata.update({
