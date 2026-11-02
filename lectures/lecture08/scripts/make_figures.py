@@ -16,9 +16,9 @@
   05_sphere_cylinder   §3.2: та же окружность как сфера ∩ плоскость (rank J = 2) и как сфера ∩ цилиндр (rank J = 1) — вид сбоку
   06_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
   07_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
-  08_chain_forces      §5.1: три силы на груз 1 и их треугольник — равновесие
-  09_chain_components  §5.1: сила каждого стержня, разложенная на части: горизонтальная H одна, вертикальные разные
-  10_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
+  08_chain_forces      §5: три силы на груз 1 и их треугольник — равновесие
+  09_chain_components  §5: сила каждого стержня, разложенная на части: горизонтальная H одна, вертикальные разные
+  10_portfolio_price   семинар, шаг 1: минимальный риск f*(rho) и касательная с наклоном lambda_rho
   11_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
 
@@ -133,7 +133,7 @@ def chain_xy(ch, v):
 
 
 def chain_checks(ch, v, lam):
-    """Три проверки §5.1: невязка стационарности, ранг J, собственные числа редуцированного гессиана; натяжения."""
+    """Три проверки §5: невязка стационарности, ранг J, собственные числа редуцированного гессиана; натяжения."""
     J = ca.Function("J", [ch["v"]], [ca.jacobian(ch["g"], ch["v"])])(v).full()
     gf = ca.Function("gf", [ch["v"]], [ca.gradient(ch["f"], ch["v"])])(v).full().ravel()
     lsym = ca.SX.sym("l", ch["N"] + 1)
@@ -219,7 +219,7 @@ def numbers():
             assert np.allclose(lam_i, [-1.2361, -1.0], atol=1e-4) and np.allclose(J_i, [[0.8944, 0.4472, 0], [0, 0, 1]], atol=1e-4)
         else:                                                  # множители — порядка 10^8, противоположных знаков
             assert 1e8 < np.abs(lam_i).min() < 1e9 and lam_i[0] < 0 < lam_i[1] and np.allclose(J_i[0], J_i[1], atol=1e-6)
-    # введение и §5.1: цепь на стержнях — 3 груза по 1 кг, 4 стержня по 1.25 м
+    # введение и §5: цепь на стержнях — 3 груза по 1 кг, 4 стержня по 1.25 м
     ch = rod_chain()
     v, lam, st = solve_rod_chain(ch)
     chk = chain_checks(ch, v, lam)
@@ -250,7 +250,7 @@ def numbers():
         f2 = ch2["w"] * chain_xy(ch2, v2)[1][1:-1].sum()
         f_pred = f_star + lam.sum() * (ch2["ell"] ** 2 - ch["ell"] ** 2)
         assert abs(f2 - f_exp) < 1e-3 and abs(f_pred - pred_exp) < 1e-3, (k, f2, f_pred)
-    # §5.2: портфель
+    # семинар, шаг 1: портфель
     x, fs, lam_pf = portfolio_eq(0.10)
     assert np.allclose(x, [0.0946, 0.3822, 0.3209, 0.2023], atol=2e-4) and abs(fs - 0.008204) < 1e-6
     assert abs(lam_pf[1] - 0.2571) < 1e-4 and abs(lam_pf[0] + 0.0093) < 1e-4, lam_pf
@@ -574,7 +574,7 @@ def fig_circle_cut():
 
 
 def fig_chain_components(chk):
-    """§5.1: сила каждого стержня, разложенная на части — горизонтальная H одна, вертикальные разные; без чисел."""
+    """§5: сила каждого стержня, разложенная на части — горизонтальная H одна, вертикальные разные; без чисел."""
     H = np.abs(chk["Fh"]); V = np.abs(chk["Fv"]); T = chk["F"]
     assert np.allclose(H, H[0]) and np.allclose(T, np.hypot(H, V))                    # горизонтальная часть у всех одна
     fig, ax = plt.subplots(figsize=(9.0, 3.6))
