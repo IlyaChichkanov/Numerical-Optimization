@@ -17,7 +17,7 @@
   06_parabola_curvature  §4.1: f = x2 на параболах x2 = x1^2 и x2 = -x1^2 — минимум и максимум при одном lambda
   07_circle_cut        §4.3: f вдоль окружности, кривизна +sqrt5 и -sqrt5 — редуцированный гессиан
   08_chain_forces      §5.1: три силы на груз 1 и их треугольник — равновесие
-  09_chain_rods        §5.1: натяжения стержней, их горизонтальные и вертикальные составляющие
+  09_chain_components  §5.1: сила каждого стержня, разложенная на части: горизонтальная H одна, вертикальные разные
   10_portfolio_price   §5.2: минимальный риск f*(rho) и касательная с наклоном lambda_rho
   11_ipopt_residuals   §6: inf_pr и inf_du IPOPT на цепи на стержнях по итерациям
 """
@@ -342,24 +342,24 @@ def fig_chain_forces(ch, v, lam):
     offs = {"вес": (6, -6), "стержень 0": (10, -2), "стержень 1": (4, 10)}                   # подписи — в пустом месте
     for F, col, name in forces:
         arrow(ax, p1, p1 + s_ * F, col, lw=2.6, ms=16)
-        ax.annotate(f"{name}\n{np.linalg.norm(F):.1f} Н", p1 + s_ * F, offs[name], textcoords="offset points",
+        ax.annotate(name, p1 + s_ * F, offs[name], textcoords="offset points",
                     color=col, fontsize=11, fontweight="bold", ha="left")
     ax.set_aspect("equal"); ax.set_xlim(-2.3, 0.45); ax.set_ylim(-0.75, 1.25)
-    ax.set_xlabel("$y$, м"); ax.set_ylabel("$z$, м"); ax.set_title("Три силы на груз 1")
+    ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel("$y$"); ax.set_ylabel("$z$"); ax.set_title("Три силы на груз 1")
     # справа: те же силы одна за другой — треугольник замыкается
     q = np.zeros(2)
     for F, col, name in (forces[0], forces[2], forces[1]):
         arrow(bx, q, q + F, col, lw=2.6, ms=16)
         mid = q + F / 2
         off = {"вес": (-10, 0), "стержень 1": (-20, -30), "стержень 0": (10, 6)}[name]        # снаружи треугольника
-        bx.annotate(f"{name}\n{np.linalg.norm(F):.1f} Н", mid, off, textcoords="offset points", color=col, fontsize=11,
+        bx.annotate(name, mid, off, textcoords="offset points", color=col, fontsize=11,
                     fontweight="bold", ha={"вес": "right", "стержень 1": "center", "стержень 0": "left"}[name], va="center")
         q = q + F
     assert np.linalg.norm(q) < 1e-9                                                    # треугольник замкнулся
     bx.plot(0, 0, "o", color=INK, ms=6, zorder=7)
     bx.annotate("начало = конец:\nсумма $=0$", (0, 0), (10, 2), textcoords="offset points", fontsize=11, color=INK, va="bottom")
     bx.set_aspect("equal"); bx.set_xlim(-9, 19); bx.set_ylim(-19.5, 5.5)
-    bx.set_xlabel("Н"); bx.set_ylabel("Н"); bx.set_title("Сложим их по очереди")
+    bx.set_xticks([]); bx.set_yticks([]); bx.set_title("Сложим их по очереди")
     save("08_chain_forces.png")
 
 
@@ -573,19 +573,24 @@ def fig_circle_cut():
     save("07_circle_cut.png")
 
 
-def fig_chain_rods(chk):
-    fig, ax = plt.subplots(figsize=(7.8, 4.0))
-    j = np.arange(len(chk["F"])); wd = 0.26
-    bars = ((-wd, chk["F"], ORANGE, r"натяжение $2|\lambda_j|\ell$"),
-            (0.0, np.abs(chk["Fh"]), AQUA, "горизонтальная"),
-            (wd, np.abs(chk["Fv"]), VIOLET, "вертикальная"))
-    for dx, val, col, lab in bars:
-        b = ax.bar(j + dx, val, wd, color=col, label=lab)
-        ax.bar_label(b, fmt="%.1f", fontsize=10, padding=2)
-    ax.set_xticks(j, [f"стержень {k}" for k in j]); ax.set_ylabel("сила, Н"); ax.set_ylim(0, 31)
-    ax.set_title("Горизонтальная составляющая везде одна"); ax.grid(axis="x", visible=False)
-    ax.legend(loc="upper center", ncol=3, fontsize=10)
-    save("09_chain_rods.png")
+def fig_chain_components(chk):
+    """§5.1: сила каждого стержня, разложенная на части — горизонтальная H одна, вертикальные разные; без чисел."""
+    H = np.abs(chk["Fh"]); V = np.abs(chk["Fv"]); T = chk["F"]
+    assert np.allclose(H, H[0]) and np.allclose(T, np.hypot(H, V))                    # горизонтальная часть у всех одна
+    fig, ax = plt.subplots(figsize=(9.0, 3.6))
+    step = 1.7 * H[0]
+    for j in range(4):
+        x0 = j * step
+        ax.plot([x0, x0 + H[j]], [0, 0], color=AQUA, lw=3)                            # горизонтальная часть
+        ax.plot([x0 + H[j], x0 + H[j]], [0, V[j]], color=VIOLET, lw=3)                # вертикальная часть
+        ax.plot([x0, x0 + H[j]], [0, V[j]], color=ORANGE, lw=3)                       # натяжение — вдоль стержня
+        ax.text(x0 + H[j] / 2, -1.2, "$H$", ha="center", va="top", color=AQUA, fontsize=13)
+        ax.text(x0 + H[j] + 0.5, V[j] / 2, f"$V_{j}$", ha="left", va="center", color=VIOLET, fontsize=13)
+        ax.text(x0 + H[j] * 0.42, V[j] * 0.42 + 1.0, f"$T_{j}$", ha="right", va="bottom", color=ORANGE, fontsize=13)
+        ax.text(x0 + H[j] / 2, -4.2, f"стержень {j}", ha="center", va="top", color=GRAY, fontsize=11)
+    ax.set_xlim(-1.5, 3 * step + H[0] + 3); ax.set_ylim(-7.5, V.max() + 2.5); ax.set_aspect("equal")
+    ax.axis("off"); ax.set_title("Горизонтальная часть у всех стержней одна")
+    save("09_chain_components.png")
 
 
 def fig_portfolio_price():
@@ -594,9 +599,12 @@ def fig_portfolio_price():
     fs = np.array([portfolio_eq(r)[1] for r in rhos])
     x0, f0, l0 = portfolio_eq(0.10)
     ax.plot(100 * rhos, fs, color=BLUE, label="$f^\\ast(\\rho)$ — минимальный риск")
-    ax.plot(100 * rhos, f0 + l0[1] * (rhos - 0.10), color=ORANGE, ls="--", label=f"касательная, наклон $\\lambda_\\rho={l0[1]:.3f}$")
+    ax.plot(100 * rhos, f0 + l0[1] * (rhos - 0.10), color=ORANGE, ls="--", label="касательная, наклон $\\lambda_\\rho$")
     ax.plot(10, f0, "o", color=RED, ms=8, zorder=7)
-    ax.set_xlabel(r"цель доходности $\rho$, %"); ax.set_ylabel(r"риск $\frac{1}{2}x^\top\Sigma x$")
+    ax.annotate("$\\rho_0$", (10, 0), (0, -16), textcoords="offset points", ha="center", fontsize=12, annotation_clip=False)
+    ax.plot([10, 10], [0, f0], ":", color=GRAY, lw=1.2)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xlabel(r"цель доходности $\rho$", labelpad=24); ax.set_ylabel(r"минимальный риск $f^\ast$")
     ax.set_title("Цена доходности — наклон $f^\\ast$"); ax.set_ylim(0, 0.025); ax.legend(fontsize=11, loc="upper left")
     save("10_portfolio_price.png")
 
@@ -628,6 +636,6 @@ if __name__ == "__main__":
     fig_parabola_curvature()
     fig_circle_cut()
     fig_chain_forces(ch, v, lam)
-    fig_chain_rods(chk)
+    fig_chain_components(chk)
     fig_portfolio_price()
     fig_ipopt_residuals(st)
