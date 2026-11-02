@@ -412,42 +412,23 @@ $$
 f\big(x(t)\big)=ct^2,\qquad\frac{d^2}{dt^2}f\big(x(t)\big)=2c .
 $$
 
-При $c=1$ вторая производная положительна — минимум, при $c=-1$ отрицательна — максимум. Ниже та же величина $2c$ получится из функции Лагранжа.
+При $c=1$ вторая производная положительна — минимум, при $c=-1$ отрицательна — максимум. В §4.2 та же величина $2c$ получится из функции Лагранжа.
 
-### 4.2. Вторая производная вдоль поверхности
+### 4.2. Редуцированный гессиан и теорема
 
-Пусть $x(t)\in\mathbb R^n$ — кривая на поверхности, $x(0)=x^\ast$. Её скорость $p=x'(0)\in T$, ускорение $x''(0)\in\mathbb R^n$. Продифференцируем дважды $f(x(t))$ и тождество $g_k(x(t))=0$ по правилу сложной функции, при $t=0$:
-
-$$
-\begin{aligned}
-\frac{d^2}{dt^2}f\big(x(t)\big)&=p^\top\nabla^2f\,p+\nabla f^\top x''(0),\\
-0&=p^\top\nabla^2g_k\,p+\nabla g_k^\top x''(0),\qquad k=1,\dots,m .
-\end{aligned}
-$$
-
-Умножим вторые строки на $\lambda_k^\ast$ и вычтем из первой. При $x''(0)$ останется $\nabla f-\sum_k\lambda_k^\ast\nabla g_k=\nabla_xL=0$, и ускорение пропадёт:
+Как в §3.2, столбцы матрицы $Z$ размера $n\times(n-m)$ — базис $T$. **Редуцированный гессиан** (*reduced Hessian*) — матрица размера $(n-m)\times(n-m)$:
 
 $$
-\frac{d^2}{dt^2}f\big(x(t)\big)\Big|_{t=0}=p^\top\nabla^2_{xx}L(x^\ast,\lambda^\ast)\,p,\qquad\nabla^2_{xx}L=\nabla^2f-\sum_k\lambda_k^\ast\nabla^2g_k .
+Z^\top\nabla^2_{xx}L\,Z,\qquad\nabla^2_{xx}L=\nabla^2f-\sum_k\lambda_k^\ast\nabla^2g_k .
 $$
 
-На параболе $\nabla^2f=0$, а у $\nabla^2g$ ненулевой один элемент $\partial^2g/\partial x_1^2=-2c$. При $\lambda=1$ и $p=(1,\ 0)$
+Матрицу $Z$ в SciPy даёт `scipy.linalg.null_space(J)`. На параболе $\nabla^2f=0$, у $\nabla^2g$ ненулевой один элемент $\partial^2g/\partial x_1^2=-2c$, а из $Jp=p_2=0$ получаем $Z=(1,\ 0)^\top$. При $\lambda=1$
 
 $$
-\nabla^2_{xx}L=0-1\cdot\begin{pmatrix}-2c&0\\0&0\end{pmatrix}=\begin{pmatrix}2c&0\\0&0\end{pmatrix},\qquad p^\top\nabla^2_{xx}L\,p=2c ,
+\nabla^2_{xx}L=0-1\cdot\begin{pmatrix}-2c&0\\0&0\end{pmatrix}=\begin{pmatrix}2c&0\\0&0\end{pmatrix},\qquad Z^\top\nabla^2_{xx}L\,Z=2c ,
 $$
 
-как в §4.1. Сама $f$ линейна: **вся кривизна пришла от ограничения** через слагаемое $-\lambda\nabla^2g$.
-
-### 4.3. Редуцированный гессиан и теорема
-
-Как в §3.2, столбцы матрицы $Z$ размера $n\times(n-m)$ — базис $T$, и любое $p\in T$ — это $p=Zw$, $w\in\mathbb R^{n-m}$. Подставим в формулу §4.2:
-
-$$
-p^\top\nabla^2_{xx}L\,p=(Zw)^\top\nabla^2_{xx}L\,(Zw)=w^\top\big(Z^\top\nabla^2_{xx}L\,Z\big)\,w .
-$$
-
-Матрица в скобках — **редуцированный гессиан** (*reduced Hessian*) размера $(n-m)\times(n-m)$. Матрицу $Z$ в SciPy даёт `scipy.linalg.null_space(J)`. У параболы $J=(0,\ 1)$, из $Jp=p_2=0$ получаем $Z=(1,\ 0)^\top$ и $Z^\top\nabla^2_{xx}L\,Z=2c$.
+та же $2c$, что в §4.1. Сама $f$ линейна: **вся кривизна пришла от ограничения** через слагаемое $-\lambda\nabla^2g$.
 
 **Теорема (условия второго порядка).** Пусть $f$ и $g$ дважды непрерывно дифференцируемы, в $x^\ast$ выполнено LICQ, $\nabla_xL(x^\ast,\lambda^\ast)=0$ и $g(x^\ast)=0$.
 
@@ -460,15 +441,24 @@ $$
 
 **Шаг 1.** Как в §3.2, поверхность около $x^\ast$ — это $x=\psi(u)$, $Z=\psi'(u^\ast)$. У функции $\tilde f(u)=f(\psi(u))$ ограничений нет. На параболе $\psi(u)=(u,\ cu^2)$ и $\tilde f(u)=cu^2$ — это расчёт §4.1.
 
-**Шаг 2.** Прямая $u^\ast+tw$ переходит в кривую $\psi(u^\ast+tw)$ на поверхности со скоростью $Zw$. Её вторая производная по §4.2 даёт
+**Шаг 2.** Найдём $\nabla^2\tilde f$. Прямая $u^\ast+tw$ переходит в кривую $x(t)=\psi(u^\ast+tw)$ на поверхности со скоростью $p=x'(0)=Zw$. Продифференцируем дважды $f(x(t))$ и тождество $g_k(x(t))=0$ по правилу сложной функции, при $t=0$:
 
 $$
-w^\top\nabla^2\tilde f(u^\ast)\,w=w^\top Z^\top\nabla^2_{xx}L\,Z\,w\quad\text{для всех }w,\qquad\text{то есть}\qquad\nabla^2\tilde f(u^\ast)=Z^\top\nabla^2_{xx}L\,Z .
+\begin{aligned}
+\frac{d^2}{dt^2}f\big(x(t)\big)&=p^\top\nabla^2f\,p+\nabla f^\top x''(0),\\
+0&=p^\top\nabla^2g_k\,p+\nabla g_k^\top x''(0),\qquad k=1,\dots,m .
+\end{aligned}
+$$
+
+Первое слагаемое — кривизна самой $f$, второе — изгиб кривой. Умножим строки для $g_k$ на $\lambda_k^\ast$ и вычтем из первой. При $x''(0)$ останется $\nabla f-\sum_k\lambda_k^\ast\nabla g_k=\nabla_xL=0$, и изгиб пропадёт. Слева — вторая производная $\tilde f$ вдоль прямой, то есть $w^\top\nabla^2\tilde f\,w$:
+
+$$
+w^\top\nabla^2\tilde f(u^\ast)\,w=p^\top\nabla^2_{xx}L\,p=w^\top Z^\top\nabla^2_{xx}L\,Z\,w\quad\text{для всех }w,\qquad\text{то есть}\qquad\nabla^2\tilde f(u^\ast)=Z^\top\nabla^2_{xx}L\,Z .
 $$
 
 **Шаг 3.** Точки $\psi(u)$ около $u^\ast$ — ровно точки поверхности около $x^\ast$. Поэтому минимум $f$ на поверхности — минимум $\tilde f$ без ограничений, и работают условия лекции 4 для $\nabla^2\tilde f$.
 
-### 4.4. Ответ для окружности
+### 4.3. Ответ для окружности
 
 В задаче 1 $f=\tfrac12\lVert x-a\rVert^2$ и $g=\tfrac12(\lVert x\rVert^2-1)$, поэтому $\nabla^2f=\nabla^2g=I$ и $\nabla^2_{xx}L=(1-\lambda)\,I$. Касательное направление — $Z=(-x_2,\ x_1)^\top$ из §2.1, $Z^\top Z=1$. Редуцированный гессиан — число $1-\lambda$:
 
