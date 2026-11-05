@@ -2,7 +2,7 @@
 
 Разбор с проверкой кодом — [`exercises08.ipynb`](exercises08.ipynb). Условия — раздел 10 [конспекта](lecture08.md).
 
-**8.0.** (а) $\lambda=(d-q^\top x_0)/\lVert q\rVert^2$, $x^\ast=x_0+\lambda q$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
+**8.0.** (а) $\lambda=(d-q^\top x_0)/\lVert q\rVert^2$, $x^\ast=x_0+\lambda q$ — проекция из лекции 2; $\nabla^2_{xx}L=I$. (б) $\lambda=\pm1/\sqrt2$, $x=\pm(1,1)/\sqrt2$; минимум при $\lambda=-1/\sqrt2$, $f=-\sqrt2$ ($\nabla^2_{xx}L=\sqrt2I$). (в) Система: $yz=2\lambda(y+z)$, $xz=2\lambda(x+z)$, $xy=2\lambda(x+y)$, $2(xy+yz+zx)=6$. Умножим первые три на $x$, $y$, $z$: левые части равны $xyz$, поэтому $x(y+z)=y(x+z)=z(x+y)$, откуда $x=y=z$. Сторона $1$, $\lambda=1/4=\partial V^\ast/\partial S$: лишняя единица площади даёт четверть объёма; в записи $\min(-V)$ множитель $-1/4$.
 
 **8.1.** (а) $x=\pm a/\sqrt5$, $\lambda=1\mp\sqrt5$. (б) $Z=(-x_2,x_1)^\top$, редуцированный гессиан $1-\lambda=\pm\sqrt5$: минимум и максимум. При $a=(0.3,0.1)$ в минимуме $\lambda=0.684>0$ — знак $\lambda$ сменился, редуцированный гессиан $\pm0.316$ по-прежнему различает точки.
 
