@@ -577,6 +577,7 @@ def fig_chain_components(chk):
     """§5: сила каждого стержня, разложенная на части — горизонтальная H одна, вертикальные разные; без чисел."""
     H = np.abs(chk["Fh"]); V = np.abs(chk["Fv"]); T = chk["F"]
     assert np.allclose(H, H[0]) and np.allclose(T, np.hypot(H, V))                    # горизонтальная часть у всех одна
+    assert np.allclose(V[[1, 2]], 0.5 * 9.81) and np.allclose(V[[0, 3]], 1.5 * 9.81)  # V1 = V2 = w/2, V0 = V3 = 1.5 w
     fig, ax = plt.subplots(figsize=(9.0, 3.6))
     step = 1.7 * H[0]
     for j in range(4):
