@@ -11,3 +11,25 @@ lectures/*/img/demo_*
 lectures/**/*.pdf
 homeworks/**/*.pdf
 build/
+
+# Project handoff / local-only data (2026-11-08)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.uv-cache/
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+board_access_ed25519*
+board_known_hosts
+demo-access.txt
+contest-users-2026/
+**/work-chats/
+**/*chat-history*.json
+**/lego-chat-history.available.json
