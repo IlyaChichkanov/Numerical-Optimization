@@ -7,9 +7,9 @@
 Ячейки демонстраций берутся из build_demo09.py (тот же код, что в demo09.ipynb) и собраны в конце,
 в разделе «## Демо», после вопросов для самопроверки:
 
-    (a) метод Ньютона–Лагранжа: шаг руками, окружность, цепь при lambda = 0  -> к разделу 2
-    (b) матрица ККТ и шаг по частям: вырожденная K, цепь против IPOPT, три способа -> к разделам 3–4
-    (c) обобщённый Гаусс–Ньютон: множитель ошибки равен lambda*               -> к разделу 5
+    (a) метод Ньютона–Лагранжа: шаг руками на дороге, бросок против IPOPT   -> к разделу 2
+    (b) матрица ККТ и шаг по частям: det K, бросок с T = 0, вершина, три способа -> к разделам 3–4
+    (c) обобщённый Гаусс–Ньютон: множитель ошибки q и три дома               -> к разделу 5
 
 Части (0) и (e) остаются только в demo09.ipynb. Заголовки частей «## (a) …» становятся
 «### Демо (a). …», чтобы не ломать нумерацию разделов конспекта. Вторая ячейка demo09
@@ -41,7 +41,7 @@ def demo_parts() -> tuple[nbf.NotebookNode, dict[str, list[nbf.NotebookNode]]]:
     """Возвращает ячейку с импортами и словарь часть -> её ячейки (без шпаргалки)."""
     cells = build_demo09.cells
     assert cells[0].cell_type == "markdown" and cells[0].source.startswith("# Демонстрации")
-    assert cells[1].cell_type == "code" and "def rod_chain(" in cells[1].source
+    assert cells[1].cell_type == "code" and "def road_kkt(" in cells[1].source
     parts: dict[str, list[nbf.NotebookNode]] = {}
     current = None
     for cell in cells[2:]:
@@ -70,11 +70,10 @@ def main() -> None:
         '"""Вспомогательный код демонстраций лекции 9.\n\n'
         'Метод Ньютона–Лагранжа: newton_lagrange(kkt, x0, lam0) -> список (x_k, lam_k, |F_k|); kkt(x, lam) -> (grad f, J, H, g),\n'
         '        знак L = f - lam^T g, шаг [[H, -J^T], [J, 0]] (p, dlam) = -(grad_x L, g).\n'
-        'Окружность: A_CIRCLE = (2, 1), circle_kkt(a) -> kkt; ggn_circle(a, x0, iters) -> точки обобщённого Гаусса–Ньютона;\n'
-        '        angle_err(xs, a) -> угол до луча к a.\n'
-        'Цепь на стержнях: rod_chain(N, L_total, m) -> словарь (v, f, g — CasADi; kkt; w, ell, N, v0); lam_ls(kkt, x, m) -> множители по МНК;\n'
-        '        solve_rod_chain(ch, v0) -> (v*, lam* в нашем знаке, stats IPOPT); chain_xy(ch, v) -> (y, z) с опорами.\n'
-        'Рисовалки: unit_circle(ax), draw_chain(ax, ch, v). Нужен CasADi (--group casadi).\n\n'
+        'Дом у дороги: A_ROAD = (2, 1), road_kkt(a) -> kkt для дороги x2 = x1^2; road_ggn_kkt(a) -> kkt обобщённого Гаусса–Ньютона.\n'
+        'Бросок: throw_problem(D) -> словарь (x, f, g — CasADi; kkt); solve_throw_ipopt(pr, x0) -> (x*, lam* в нашем знаке, stats IPOPT);\n'
+        '        throw_path(v1, v2, T) -> полёт до момента T; lam_ls(kkt, x, m) -> множители по МНК.\n'
+        'Рисовалка: draw_road(ax). Нужен CasADi (--group casadi).\n\n'
         'Файл генерируется скриптом scripts/build_lecture09.py из scripts/build_demo09.py — не правьте руками.\n"""\n\n'
         + helper_body + "\n",
         encoding="utf-8",
@@ -97,7 +96,7 @@ def main() -> None:
         "Ячейка ниже подключает вспомогательный код из [`l9helpers.py`](l9helpers.py): палитру, метод `newton_lagrange` и задачи."
     ))
     out.append(nbf.v4.new_code_cell(
-        "%matplotlib inline\n\nfrom l9helpers import *  # палитра, метод Ньютона–Лагранжа, окружность, цепь на стержнях (см. файл рядом)"
+        "%matplotlib inline\n\nfrom l9helpers import *  # палитра, метод Ньютона–Лагранжа, дом у дороги, бросок (см. файл рядом)"
     ))
     for part in DEMOS:
         out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"
