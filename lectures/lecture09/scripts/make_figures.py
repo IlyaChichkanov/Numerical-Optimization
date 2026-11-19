@@ -9,7 +9,7 @@
 Картинки в порядке появления в конспекте:
   00_road           введение, задача 1: дорога x2 = x1^2, дом a = (2, 1) и старт (1, 0) под дорогой
   00_throw          введение, задача 2: броски под разными углами в одну точку D = 30 м
-  01_nl_road        §2.1: Ньютон–Лагранж на дороге из (1, 0) — точки не на дороге и норма невязки
+  01_nl_road        §2.3: Ньютон–Лагранж на дороге из (1, 0) — первый шаг до касательной, норма невязки
   02_nl_throw       §2.3: бросок — полёт мяча по итерациям; две половины невязки и лог IPOPT
   03_road_vertex    §3.3, спрятанный ответ: дом над вершиной, из вершины метод не уходит — это самая дальняя точка
   04_step_split     §4: шаг из (1, 0) = часть к линеаризованному ограничению + часть вдоль него
@@ -163,6 +163,11 @@ def numbers():
     assert np.allclose(np.concatenate([gf0, g0]), [-1, -1, -1])
     assert np.allclose(xs[1], [1.2, 1.4]) and np.isclose(ls[1], 0.4)
     assert np.allclose(Fn[:5], [1.732, 0.165, 3.02e-3, 1.13e-6, 1.57e-13], rtol=6e-3), Fn
+    # §2.3: x(1) лежит на касательной x2 = 2 x1 - 1, нарушение x2 - x1^2 падает квадратично, ответ на дороге
+    assert np.isclose(xs[1, 1], 2 * xs[1, 0] - 1)
+    gviol = xs[:, 1] - xs[:, 0] ** 2
+    assert np.allclose(gviol[:4], [-1, -0.04, -1.15e-3, -5.84e-7], rtol=6e-3), gviol
+    assert abs(gviol[4]) < 1e-12
     assert len(h) - 1 == 4
     assert np.allclose(xst, [1.1654, 1.3581], atol=1e-4) and np.isclose(lst, 0.3581, atol=1e-4)
     assert np.isclose(np.linalg.norm(A_ROAD - xst), 0.908, atol=1e-3)
@@ -316,6 +321,10 @@ def fig_throw():
 def fig_nl_road(xs, ls, Fn):
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(9.0, 4.4), gridspec_kw=dict(width_ratios=[1, 1.05]))
     road(ax, (0.3, 1.6))
+    t = np.linspace(0.62, 1.55, 2)
+    ax.plot(t, 2 * t - 1, "--", color=GRAY, lw=1.4)                                 # g(x0) + J p = 0: x2 = 2 x1 - 1
+    ax.plot(1, 1, "o", color=GRAY, ms=5, zorder=6)                                   # точка касания (1, 1)
+    ax.annotate("касательная\nв $(1,1)$", (1.5, 2.0), (6, -4), textcoords="offset points", fontsize=11, color=GRAY)
     house(ax, A_ROAD, "$a$", (6, 6))
     for k in range(2):
         arrow(ax, xs[k], xs[k + 1], ORANGE, lw=1.8, ms=12)
@@ -325,7 +334,7 @@ def fig_nl_road(xs, ls, Fn):
     ax.plot(*xs[-1], "*", color=BLUE, ms=15, zorder=8)
     ax.annotate(r"$x^\ast$", xs[-1], (10, -12), textcoords="offset points", fontsize=12, color=BLUE)
     ax.set_aspect("equal"); ax.set_xlim(0.3, 2.3); ax.set_ylim(-0.25, 2.2)
-    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Точки идут не по дороге")
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Первый шаг — до касательной")
     k = np.arange(len(Fn))
     bx.semilogy(k, Fn, "o-", color=ORANGE, ms=8)
     for i in range(len(Fn)):
