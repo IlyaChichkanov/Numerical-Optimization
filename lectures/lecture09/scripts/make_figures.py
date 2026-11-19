@@ -14,7 +14,7 @@
   03_road_vertex    §3.4, спрятанный ответ: дом над вершиной, из вершины метод не уходит — это самая дальняя точка
   04_step_split     §4: шаг из (1, 0) = часть к линеаризованному ограничению + часть вдоль него
                     (в лекции не используется с 19.11, раздел «шаг по частям» убран; картинка оставлена для лекции 13)
-  05_ggn_road       §5: обобщённый Гаусс–Ньютон на дороге — медленные шаги к вершине и ошибка при трёх домах
+  05_ggn_road       §4: ошибка Ньютона–Лагранжа и Гаусса–Ньютона по итерациям, дома (2, 1) и (2.5, 0) при трёх домах
 """
 
 from pathlib import Path
@@ -233,9 +233,10 @@ def numbers():
     assert np.isclose(np.linalg.norm(av - hc[-1][0]), np.sqrt(1.75)) and 2 > np.sqrt(1.75)   # вершина дальше: 2 против 1.32
     out["vertex"] = (av, hc[-1][0])
 
-    # §5: обобщённый Гаусс–Ньютон, множитель ошибки q = 1 - Z^T H Z / Z^T Z = -2 lam* / (1 + 4 x1*^2)
+    # §4: обобщённый Гаусс–Ньютон против Ньютона–Лагранжа; ошибка ГН за шаг умножается на |q|,
+    # q = 1 - Z^T H Z / Z^T Z = -2 lam* / (1 + 4 x1*^2) (в конспекте формулы нет — только измеренные отношения)
     ggn = {}
-    for a, its_g, its_n, q_ref in (((1.5, 2.0), 6, 4, -0.0059), ((2.0, 1.0), 11, 4, -0.1113), ((0.0, 0.3), 43, 6, 0.6)):
+    for a, its_g, its_n, q_ref in (((1.5, 2.0), 6, 4, -0.0059), ((2.0, 1.0), 11, 4, -0.1113), ((2.5, 0.0), 24, 4, -0.3864), ((0.0, 0.3), 43, 6, 0.6)):
         a = np.array(a)
         hn = newton_lagrange(road_kkt(a), [1.0, 0.0], [0.0])
         hg = newton_lagrange(road_ggn_kkt(a), [1.0, 0.0], [0.0], maxit=500)
@@ -248,6 +249,8 @@ def numbers():
         if abs(q) > 0.05:
             assert np.allclose(e[6:9] / e[5:8], abs(q), atol=0.02), (a, e[6:9] / e[5:8])
         ggn[tuple(a)] = (hg, hn, q)
+    for a_, d_ in (((2.0, 1.0), 0.908), ((2.5, 0.0), 1.792)):                       # расстояния в тексте §4
+        assert np.isclose(np.linalg.norm(np.array(a_) - ggn[a_][1][-1][0]), d_, atol=1e-3)
     assert np.allclose(ggn[(2.0, 1.0)][0][1][0], [1.2, 1.4])                       # первый шаг = шаг §2.1 (при lam = 0 H = I)
     ggn_throw = lambda x, lam: (*tk(x, lam)[:2], np.diag([1.0, 1.0, 0.0]), tk(x, lam)[3])   # J_r^T J_r = diag(1, 1, 0)
     hgt = newton_lagrange(ggn_throw, x0, l0, maxit=60)
@@ -411,28 +414,19 @@ def fig_step_split(pN, pZ):
 
 
 def fig_ggn_road(ggn):
-    fig, (ax, bx) = plt.subplots(1, 2, figsize=(9.0, 4.3), gridspec_kw=dict(width_ratios=[1, 1.1]))
-    hg, hn, q = ggn[(0.0, 0.3)]
-    road(ax, (-0.75, 1.15))
-    house(ax, (0.0, 0.3))
-    ax.annotate("дом $(0,\\ 0.3)$", (0.0, 0.3), (0.55, 0.55), fontsize=12,
-                arrowprops=dict(arrowstyle="-", color=GRAY, lw=1))
-    P = np.array([t[0] for t in hg][:14]); N = np.array([t[0] for t in hn])
-    ax.plot(P[:, 0], P[:, 1], "o-", color=ORANGE, ms=5, lw=1.3, label=f"Гаусс–Ньютон: {len(hg) - 1} итерации")
-    ax.plot(N[:, 0], N[:, 1], "s--", color=BLUE, ms=5, lw=1.1, label=f"Ньютон–Лагранж: {len(hn) - 1}")
-    ax.legend(loc="upper left", fontsize=10.5)
-    ax.set_aspect("equal"); ax.set_xlim(-0.8, 1.3); ax.set_ylim(-0.25, 1.35)
-    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Медленный подход к вершине")
-    cols = {(1.5, 2.0): AQUA, (2.0, 1.0): BLUE, (0.0, 0.3): ORANGE}
-    for a, (hg_, hn_, q_) in ggn.items():
-        xa = hn_[-1][0]
-        e = np.array([np.linalg.norm(t[0] - xa) for t in hg_])
-        e = e[e > 1e-13]
-        bx.semilogy(np.arange(len(e)), e, "o-", color=cols[a], ms=3.5, lw=1.4,
-                    label=f"дом $({a[0]:g},\\ {a[1]:g})$: $q={q_:.2g}$")
-    bx.legend(loc="upper right", fontsize=10.5)
-    bx.set_xlabel("итерация $k$"); bx.set_ylabel(r"$\|x^{(k)}-x^\ast\|$"); bx.set_ylim(1e-12, 5); bx.set_xlim(-1, 46)
-    bx.set_title("Ошибка Гаусса–Ньютона")
+    """Два метода на одной задаче: ошибка по итерациям для домов (2, 1) и (2.5, 0)."""
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.0), sharey=True)
+    for ax, a in zip(axes, ((2.0, 1.0), (2.5, 0.0))):
+        hg, hn, _ = ggn[a]
+        xa = hn[-1][0]
+        for h, c, mk, name in ((hn, BLUE, "s", "Ньютон–Лагранж"), (hg, ORANGE, "o", "Гаусс–Ньютон")):
+            e = np.array([np.linalg.norm(t[0] - xa) for t in h])
+            e = e[e > 1e-14]
+            ax.semilogy(np.arange(len(e)), e, mk + "-", color=c, ms=4.5, lw=1.5, label=f"{name}: {len(h) - 1}")
+        ax.set_title(f"Дом $({a[0]:g},\\ {a[1]:g})$")
+        ax.set_xlabel("итерация $k$"); ax.set_ylim(1e-13, 10); ax.set_xlim(-0.8, 25.5)
+        ax.legend(loc="upper right", fontsize=10.5)
+    axes[0].set_ylabel(r"$\|x^{(k)}-x^\ast\|$")
     save("05_ggn_road.png")
 
 
