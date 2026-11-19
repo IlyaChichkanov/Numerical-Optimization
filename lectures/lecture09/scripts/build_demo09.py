@@ -282,7 +282,7 @@ md(r"""## Шпаргалка
 |---|---|---|
 | система | $F=(\nabla f-J^\top\lambda,\ g)=0$ | §1 |
 | матрица ККТ | $K=\begin{pmatrix}H&-J^\top\\J&0\end{pmatrix}$ | §2.1 |
-| когда $K$ невырождена | LICQ и $Z^\top HZ\succ0$ | §3.1 |
+| когда $K$ невырождена | LICQ и $Z^\top HZ\succ0$ | §3.2 |
 | null-space | $p=p_N+Zu$, система $(n-m)\times(n-m)$ | §4 |
 | range-space | $JH^{-1}J^\top\lambda^+=JH^{-1}\nabla f-g$ | §4 |
 | обобщённый Гаусс–Ньютон | $H\to J_r^\top J_r$, ошибка $\times q$ | §5 |

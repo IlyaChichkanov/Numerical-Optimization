@@ -11,7 +11,7 @@
   00_throw          введение, задача 2: броски под разными углами в одну точку D = 30 м
   01_nl_road        §2.3: Ньютон–Лагранж на дороге из (1, 0) — первый шаг до касательной, норма невязки
   02_nl_throw       §2.3: бросок — полёт мяча по итерациям; две половины невязки и лог IPOPT
-  03_road_vertex    §3.3, спрятанный ответ: дом над вершиной, из вершины метод не уходит — это самая дальняя точка
+  03_road_vertex    §3.4, спрятанный ответ: дом над вершиной, из вершины метод не уходит — это самая дальняя точка
   04_step_split     §4: шаг из (1, 0) = часть к линеаризованному ограничению + часть вдоль него
   05_ggn_road       §5: обобщённый Гаусс–Ньютон на дороге — медленные шаги к вершине и ошибка при трёх домах
 """
@@ -173,7 +173,9 @@ def numbers():
     assert np.isclose(np.linalg.norm(A_ROAD - xst), 0.908, atol=1e-3)
     out["road"] = (xs, ls, Fn)
 
-    # §3.1: det K = 1 + 2 lam + 4 x1^2 = Z~^T H Z~, Z~ = (1, 2 x1)
+    # §3.1: на дороге H = diag(1 + 2 lam, 1), Z ~ (1, 2 x1); в старте H = I и Z^T H Z = 1
+    assert np.allclose(H0, np.eye(2)) and np.allclose(J0, [[-2.0, 1.0]])
+    # §3.2: det K = 1 + 2 lam + 4 x1^2 = Z~^T H Z~, Z~ = (1, 2 x1)
     for x_, l_ in ((xs[0], 0.0), (xst, lst), (np.array([0.3, -2.0]), -0.7)):
         _, J, H, _ = kkt(x_, [l_])
         K = np.block([[H, -J.T], [J, np.zeros((1, 1))]])
@@ -215,7 +217,12 @@ def numbers():
     assert np.allclose(it["alpha_pr"][1:], 1.0) and np.allclose(it["regularization_size"], 0.0)
     out["throw"] = (ht, (np.array(it["inf_pr"]), np.array(it["inf_du"])))
 
-    # §3.2: старт T = 0 — строки J совпадают, шаг не определён
+    # §3.1: касательное направление броска в допустимой точке — (-D/T^2, 4.905, 1)
+    for T in (1.5, 2.473, 4.0):
+        _, JT, _, gT = tk(np.array([D_THROW / T, 4.905 * T, T]), np.zeros(2))
+        assert np.allclose(gT, 0) and np.allclose(JT @ [-D_THROW / T ** 2, 4.905, 1.0], 0)
+
+    # §3.3: старт T = 0 — строки J совпадают, шаг не определён
     _, JT0, _, gT0 = tk(np.array([10.0, 10.0, 0.0]), np.zeros(2))
     assert np.allclose(JT0, [[0, 0, 10], [0, 0, 10]]) and np.allclose(gT0, [-30, 0]) and np.linalg.matrix_rank(JT0) == 1
     try:
@@ -226,7 +233,7 @@ def numbers():
     # упражнение 9.3: в ответе броска det H = 9.81 lam2 - lam1^2 - lam2^2 = 0
     assert abs(np.linalg.det(tk(ht[-1][0], ht[-1][1])[2])) < 1e-8
 
-    # §3.3: дом над вершиной — из вершины метод не уходит
+    # §3.4: дом над вершиной — из вершины метод не уходит
     av = np.array([0.0, 2.0])
     hv = newton_lagrange(road_kkt(av), [0.0, 0.0], [0.0])
     assert len(hv) - 1 == 1 and np.allclose(hv[-1][0], 0) and np.isclose(hv[-1][1][0], -2)
