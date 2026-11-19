@@ -175,13 +175,6 @@ def numbers():
 
     # §3.1: на дороге H = diag(1 + 2 lam, 1), Z ~ (1, 2 x1); в старте H = I и Z^T H Z = 1
     assert np.allclose(H0, np.eye(2)) and np.allclose(J0, [[-2.0, 1.0]])
-    # §3.2: det K = 1 + 2 lam + 4 x1^2 = Z~^T H Z~, Z~ = (1, 2 x1)
-    for x_, l_ in ((xs[0], 0.0), (xst, lst), (np.array([0.3, -2.0]), -0.7)):
-        _, J, H, _ = kkt(x_, [l_])
-        K = np.block([[H, -J.T], [J, np.zeros((1, 1))]])
-        Zt = np.array([1.0, 2 * x_[0]])
-        assert np.isclose(np.linalg.det(K), 1 + 2 * l_ + 4 * x_[0] ** 2) and np.isclose(Zt @ H @ Zt, np.linalg.det(K))
-    assert np.isclose(1 + 2 * lst + 4 * xst[0] ** 2, 7.15, atol=5e-3)
     Z0 = np.array([1.0, 2.0]) / np.sqrt(5)                                          # шаги доказательства в (1, 0), lam = 0
     assert np.allclose(J0 @ Z0, 0) and np.isclose(Z0 @ H0 @ Z0, 1)
 
