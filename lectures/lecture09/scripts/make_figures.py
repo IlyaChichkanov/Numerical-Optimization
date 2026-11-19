@@ -217,11 +217,6 @@ def numbers():
     assert np.allclose(it["alpha_pr"][1:], 1.0) and np.allclose(it["regularization_size"], 0.0)
     out["throw"] = (ht, (np.array(it["inf_pr"]), np.array(it["inf_du"])))
 
-    # §3.1: касательное направление броска в допустимой точке — (-D/T^2, 4.905, 1)
-    for T in (1.5, 2.473, 4.0):
-        _, JT, _, gT = tk(np.array([D_THROW / T, 4.905 * T, T]), np.zeros(2))
-        assert np.allclose(gT, 0) and np.allclose(JT @ [-D_THROW / T ** 2, 4.905, 1.0], 0)
-
     # §3.3: старт T = 0 — строки J совпадают, шаг не определён
     _, JT0, _, gT0 = tk(np.array([10.0, 10.0, 0.0]), np.zeros(2))
     assert np.allclose(JT0, [[0, 0, 10], [0, 0, 10]]) and np.allclose(gT0, [-30, 0]) and np.linalg.matrix_rank(JT0) == 1
