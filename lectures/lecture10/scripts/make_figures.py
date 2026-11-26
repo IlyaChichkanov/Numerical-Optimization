@@ -11,7 +11,6 @@
   00_portfolio         введение, задача 2: портфель без запрета при доходности 12 % — доля актива 1 отрицательна
   01_wall_sign         §1: знак множителя у стенки — min (x - 2)^2 при x >= 3 (mu = 2) и при x >= 1 (у стенки mu = -2)
   02_taxi_guesses      §2.1: плоскость (a, b), линии уровня f и четыре догадки; «обрезка» — не ответ
-  03_portfolio_weights §3.2: доли портфеля от доходности — без запрета (пунктир) и с запретом x >= 0
   04_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «такси»
 """
 
@@ -310,26 +309,6 @@ ax.text(1.0, 2.25, "допустимо: $a\\geq 0$, $b\\geq 0$", color=AQUA, fon
 ax.set(xlim=(-0.3, 1.6), ylim=(-1.0, 2.6), xlabel="цена километра $a$", ylabel="плата за посадку $b$",
        title="Задача «такси»: четыре догадки")
 save("02_taxi_guesses.png", min_width=600)
-
-# ---------------------------------------------------------------- 03_portfolio_weights
-rhos = np.linspace(0.06, 0.145, 120)
-w_free = np.array([portfolio_active(r, [])[0] for r in rhos])
-w_box = np.array([portfolio_bounded(r)[1] for r in rhos])
-fig, ax = plt.subplots(figsize=(9.0, 4.4))
-for i, col in enumerate((BLUE, ORANGE, AQUA, VIOLET)):
-    ax.plot(rhos * 100, w_free[:, i], "--", color=col, lw=1.4, alpha=0.8)
-    ax.plot(rhos * 100, w_box[:, i], "-", color=col, lw=2.4, label=f"актив {i + 1}")
-ax.axhline(0, color=INK, lw=0.8)
-ax.axvline(rho_zero * 100, color=GRAY, lw=1, ls=":")
-ax.axvline(12, color=GRAY, lw=1, ls=":")
-ax.text(rho_zero * 100 - 0.08, 0.86, "10.64 %", ha="right", fontsize=11, color=GRAY)
-ax.text(12.08, 0.86, "12 %", ha="left", fontsize=11, color=GRAY)
-ax.plot([], [], "--", color=GRAY, lw=1.4, label="без запрета")
-ax.plot([], [], "-", color=GRAY, lw=2.4, label="с $x\\geq 0$")
-ax.set(xlabel="требуемая доходность $\\rho$, %", ylabel="доля капитала", ylim=(-0.75, 1.0),
-       title="Доли портфеля от доходности")
-ax.legend(loc="lower left", ncol=3)
-save("03_portfolio_weights.png", min_width=800)
 
 # ---------------------------------------------------------------- 04_complementarity
 fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.2))
