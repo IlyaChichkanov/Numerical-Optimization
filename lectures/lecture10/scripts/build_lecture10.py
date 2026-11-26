@@ -9,7 +9,7 @@
 
     (a) условия ККТ в задаче «такси»                       -> к разделу 2
     (b) активное множество: портфель руками, сверка с IPOPT -> к разделу 3
-    (c) точки задачи «такси» при mu_i*h_i = tau             -> к разделу 4
+    (c) одна стенка: Ньютон на mu*h = 0 и на mu*h = tau      -> к разделу 4
 
 Часть (e) остаётся только в demo10.ipynb. Заголовки частей «## (a) …» становятся
 «### Демо (a). …», чтобы не ломать нумерацию разделов конспекта. Вторая ячейка demo10
@@ -69,7 +69,7 @@ def main() -> None:
     (LECTURE / "l10helpers.py").write_text(
         '"""Вспомогательный код демонстраций лекции 10.\n\n'
         'Задача «такси»: TAXI_T, TAXI_Y, TAXI_A; taxi_f(x), taxi_grad(x); taxi_guess(A) -> (x, mu) при ограничениях из A как равенствах;\n'
-        '        taxi_tau(tau) -> (x, mu) при mu_i*h_i = tau. Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).\n'
+        '        одна стенка (§4): wall_newton(c, x, mu, tau, inside) -> (x, mu, итераций). Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).\n'
         'Портфель: PF_R, PF_SIGMA; portfolio_active(rho, A) -> (x, lam1, lam_rho, mu) при x_i = 0 для i из A;\n'
         '        portfolio_bounded(rho) -> (A, x, lam1, lam_rho, mu) с x >= 0 перебором активных множеств.\n'
         'Рисовалка: draw_quadrant(ax). Нужен CasADi (--group casadi).\n\n'

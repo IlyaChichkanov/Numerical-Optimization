@@ -1,7 +1,7 @@
 """Вспомогательный код демонстраций лекции 10.
 
 Задача «такси»: TAXI_T, TAXI_Y, TAXI_A; taxi_f(x), taxi_grad(x); taxi_guess(A) -> (x, mu) при ограничениях из A как равенствах;
-        taxi_tau(tau) -> (x, mu) при mu_i*h_i = tau. Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).
+        одна стенка (§4): wall_newton(c, x, mu, tau, inside) -> (x, mu, итераций). Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).
 Портфель: PF_R, PF_SIGMA; portfolio_active(rho, A) -> (x, lam1, lam_rho, mu) при x_i = 0 для i из A;
         portfolio_bounded(rho) -> (A, x, lam1, lam_rho, mu) с x >= 0 перебором активных множеств.
 Рисовалка: draw_quadrant(ax). Нужен CasADi (--group casadi).
@@ -54,15 +54,21 @@ def taxi_guess(active):
     return x, taxi_grad(x)
 
 
-def taxi_tau(tau):
-    """Точка, где вместо mu_i h_i = 0 стоит mu_i h_i = tau: grad f = (mu_a, mu_b), mu_a a = mu_b b = tau, a, b > 0.
-    Из второй строки b(a) — положительный корень 4b^2 + (10a - 9.4) b - tau = 0; a — корень первой строки."""
-    def b_of(a):
-        q = 10 * a - 9.4
-        return (-q + np.sqrt(q * q + 16 * tau)) / 8
-    a = brentq(lambda a: 30 * a + 10 * b_of(a) - 29.4 - tau / a, 1e-9, 5)
-    x = np.array([a, b_of(a)])
-    return x, tau / x
+# одна стенка (§4): min (x - 2)^2 при h(x) = x - c >= 0
+def wall_newton(c, x, mu, tau=0.0, inside=False, maxit=50):
+    """Метод Ньютона для двух уравнений 2(x - 2) - mu = 0 и mu (x - c) = tau из точки (x, mu).
+    inside=True — шаг делится пополам, пока не выполнено x - c > 0 и mu > 0. Возвращает (x, mu, итераций)."""
+    for k in range(maxit):
+        F = np.array([2 * (x - 2) - mu, mu * (x - c) - tau])
+        if np.linalg.norm(F) < 1e-12:
+            return x, mu, k
+        J = np.array([[2.0, -1.0], [mu, x - c]])          # строка 2 — производные mu (x - c) по x и по mu
+        dx, dmu = np.linalg.solve(J, -F)
+        step = 1.0
+        while inside and (x + step * dx - c <= 0 or mu + step * dmu <= 0):
+            step /= 2                                      # не выходим из x - c > 0, mu > 0
+        x, mu = x + step * dx, mu + step * dmu
+    return x, mu, maxit
 
 
 # ближайшая точка круга — упражнение 10.1

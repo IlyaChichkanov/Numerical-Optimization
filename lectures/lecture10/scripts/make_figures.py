@@ -11,7 +11,7 @@
   00_portfolio         введение, задача 2: портфель без запрета при доходности 12 % — доля актива 1 отрицательна
   01_wall_sign         §1: знак множителя у стенки — min (x - 2)^2 при x >= 3 (mu = 2) и при x >= 1 (у стенки mu = -2)
   02_taxi_guesses      §2.1: плоскость (a, b), линии уровня f и четыре догадки; «обрезка» — не ответ
-  04_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «такси»
+  03_complementarity   §4: одна стенка, x >= 3 и x >= 1 — уголок mu*h = 0, лишнее решение уравнений, гиперболы mu*h = tau
 """
 
 from itertools import combinations
@@ -88,15 +88,21 @@ def taxi_guess(active):
     return x, taxi_grad(x)
 
 
-def taxi_tau(tau):
-    """Точка, где вместо mu_i h_i = 0 стоит mu_i h_i = tau: grad f = (mu_a, mu_b), mu_a a = mu_b b = tau, a, b > 0.
-    Из второй строки b(a) — положительный корень 4b^2 + (10a - 9.4) b - tau = 0; a — корень первой строки."""
-    def b_of(a):
-        q = 10 * a - 9.4
-        return (-q + np.sqrt(q * q + 16 * tau)) / 8
-    a = brentq(lambda a: 30 * a + 10 * b_of(a) - 29.4 - tau / a, 1e-9, 5)
-    x = np.array([a, b_of(a)])
-    return x, tau / x
+# одна стенка (§4): min (x - 2)^2 при h(x) = x - c >= 0
+def wall_newton(c, x, mu, tau=0.0, inside=False, maxit=50):
+    """Метод Ньютона для двух уравнений 2(x - 2) - mu = 0 и mu (x - c) = tau из точки (x, mu).
+    inside=True — шаг делится пополам, пока не выполнено x - c > 0 и mu > 0. Возвращает (x, mu, итераций)."""
+    for k in range(maxit):
+        F = np.array([2 * (x - 2) - mu, mu * (x - c) - tau])
+        if np.linalg.norm(F) < 1e-12:
+            return x, mu, k
+        J = np.array([[2.0, -1.0], [mu, x - c]])          # строка 2 — производные mu (x - c) по x и по mu
+        dx, dmu = np.linalg.solve(J, -F)
+        step = 1.0
+        while inside and (x + step * dx - c <= 0 or mu + step * dmu <= 0):
+            step /= 2                                      # не выходим из x - c > 0, mu > 0
+        x, mu = x + step * dx, mu + step * dmu
+    return x, mu, maxit
 
 
 # ближайшая точка круга — упражнение 10.1
@@ -164,14 +170,27 @@ assert abs(taxi_f(x_clip) - 0.724) < 5e-4 and abs(taxi_f(x_taxi) - 0.124) < 5e-4
 print(f"   такси: без ограничений {x_free.round(2)}, ответ {x_taxi.round(2)}, mu = {mu_taxi.round(2)}; "
       f"f: обрезка {taxi_f(x_clip):.3f}, ответ {taxi_f(x_taxi):.3f}")
 
-tau_rows = {}
-for tau in (1.0, 0.1, 0.01, 0.001):
-    x_t, mu_t = taxi_tau(tau)
-    assert x_t.min() > 0 and np.allclose(taxi_grad(x_t), mu_t) and np.allclose(mu_t * x_t, tau)
-    tau_rows[tau] = (x_t, mu_t, np.linalg.norm(x_t - x_taxi))
-assert np.allclose(tau_rows[0.1][0], [0.924, 0.180], atol=5e-4) and abs(tau_rows[0.1][2] - 0.19) < 5e-3
-assert abs(tau_rows[0.01][2] - 0.025) < 5e-4 and abs(tau_rows[0.001][2] - 0.0026) < 5e-5
-print("   путь mu*h = tau:", ", ".join(f"tau={t}: x=({r[0][0]:.3f}, {r[0][1]:.3f}), до ответа {r[2]:.4f}" for t, r in tau_rows.items()))
+# ---- одна стенка (§4)
+x_w, mu_w, k_w = wall_newton(3, 3.5, 0.1)
+assert np.allclose([x_w, mu_w], [2, 0]) and k_w == 5               # из допустимой (3.5, 0.1) — в лишнее решение (2, 0)
+assert np.allclose(wall_newton(3, 4.0, 1.0)[:2], [3, 2])            # из (4, 1) — в ответ (3, 2)
+try:
+    wall_newton(3, 3.0, 0.0)                                          # вершина уголка: строка (mu, x - 3) = (0, 0)
+    raise AssertionError("в вершине матрица должна быть вырождена")
+except np.linalg.LinAlgError:
+    pass
+wall_rows = {}
+for c in (3, 1):
+    for tau in (0.5, 0.1, 0.01):
+        x_t, mu_t, k_t = wall_newton(c, c + 1.0, 1.0, tau, inside=True)
+        assert abs(x_t - ((2 + c) + np.sqrt((c - 2) ** 2 + 2 * tau)) / 2) < 1e-9 and x_t > c and mu_t > 0 and k_t <= 8
+        wall_rows[c, tau] = (x_t, mu_t)
+assert np.allclose(wall_rows[3, 0.1], [3.048, 2.095], atol=5e-4) and np.allclose(wall_rows[3, 0.01], [3.005, 2.010], atol=5e-4)
+assert np.allclose(wall_rows[1, 0.1], [2.048, 0.095], atol=5e-4) and np.allclose(wall_rows[1, 0.01], [2.005, 0.010], atol=5e-4)
+x_minus = 2.5 - np.sqrt(0.25 + 0.1 / 2)                                    # второй корень 2(x-2)(x-3) = 0.1 — вне x > 3, mu > 0
+assert np.allclose([x_minus, 2 * (x_minus - 2)], [1.95, -0.10], atol=5e-3)
+print("   одна стенка: Ньютон на mu*h = 0 из (3.5, 0.1) -> (2, 0) за 5;",
+      ", ".join(f"x>={c}, tau={t}: ({v[0]:.3f}, {v[1]:.3f})" for (c, t), v in wall_rows.items()))
 
 # ---- ближайшая точка круга (упражнение 10.1)
 assert np.allclose(park_solution((2, 1))[0], [0.894, 0.447], atol=5e-4) and abs(park_solution((2, 1))[1] - 0.618) < 5e-4
@@ -310,31 +329,29 @@ ax.set(xlim=(-0.3, 1.6), ylim=(-1.0, 2.6), xlabel="цена километра $
        title="Задача «такси»: четыре догадки")
 save("02_taxi_guesses.png", min_width=600)
 
-# ---------------------------------------------------------------- 04_complementarity
-fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.2))
-ax = axes[0]
-ax.plot([0, 1.1], [0, 0], color=INK, lw=3.5)
-ax.plot([0, 0], [0, 1.1], color=INK, lw=3.5, label="$\\mu h=0$, $\\mu\\geq 0$, $h\\geq 0$")
-for tau, col in ((0.1, BLUE), (0.01, VIOLET)):
-    hh = np.linspace(tau / 1.1, 1.1, 300)
-    ax.plot(hh, tau / hh, color=col, lw=2, label=f"$\\mu h={tau}$")
-ax.plot(x_taxi[0], 0, "s", color=ORANGE, ms=9, zorder=6)                       # a >= 0: h_1 = 0.98, mu_1 = 0
-ax.plot(0, mu_taxi[1], "o", color=ORANGE, ms=9, zorder=6)                      # b >= 0: h_2 = 0, mu_2 = 0.4
-ax.text(x_taxi[0], 0.06, "$a\\geq 0$", ha="center", fontsize=11)
-ax.text(0.05, mu_taxi[1] + 0.04, "$b\\geq 0$", fontsize=11)
-ax.set(xlim=(-0.05, 1.1), ylim=(-0.05, 1.1), xlabel="$h$", ylabel="$\\mu$", title="Уголок и гиперболы")
-ax.legend(loc="upper right", fontsize=10)
-ax = axes[1]
-ax.fill_between([0, 1.3], 0, 1.0, color=AQUA, alpha=0.15)
-ax.axhline(0, color=AQUA, lw=2.5)
-ax.axvline(0, color=AQUA, lw=2.5)
-pts = np.array([tau_rows[tau][0] for tau in (1.0, 0.1, 0.01)])
-ax.plot(pts[:, 0], pts[:, 1], "o-", color=BLUE, ms=6, lw=1.2)
-for tau, p, (dx, dy, ha) in zip((1.0, 0.1, 0.01), pts, ((-0.05, 0.03, "right"), (-0.05, 0.03, "right"), (-0.06, 0.06, "right"))):
-    ax.text(p[0] + dx, p[1] + dy, f"$\\tau={tau}$", fontsize=11, ha=ha)
-ax.plot(*x_taxi, "*", color=INK, ms=12, zorder=6)
-ax.text(x_taxi[0] + 0.04, x_taxi[1] + 0.05, "ответ", fontsize=11)
-ax.set(xlim=(-0.05, 1.3), ylim=(-0.08, 1.0), xlabel="$a$", ylabel="$b$", title="Задача «такси»: точки при $\\mu_ih_i=\\tau$")
-save("04_complementarity.png", min_width=800)
+# ---------------------------------------------------------------- 03_complementarity
+fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.6), sharey=True)
+xx = np.linspace(0.3, 4.6, 300)
+cases = ((axes[0], 3, "$x\\geq 3$: ограничение работает", (3, 2), (2, 0), "лишнее: $x<3$", (1.9, 0.3, "right")),
+         (axes[1], 1, "$x\\geq 1$: ограничение не работает", (2, 0), (1, -2), "лишнее: $\\mu<0$", (1.15, -2.25, "left")))
+for ax, c, title, answer, wrong, wrong_txt, (tx, ty, ha) in cases:
+    ax.axvline(c, color=GRAY, lw=0.9, ls=":")                                  # mu (x - c) = 0 — обе оси целиком
+    ax.axhline(0, color=GRAY, lw=0.9, ls=":")
+    ax.plot([c, c], [0, 3.3], color=AQUA, lw=4)                                  # уголок: x = c, mu >= 0
+    ax.plot([c, 4.6], [0, 0], color=AQUA, lw=4, label="уголок: $\\mu h=0$, $h\\geq 0$, $\\mu\\geq 0$")
+    ax.plot(xx, 2 * (xx - 2), color=BLUE, lw=2, label="стационарность $\\mu=2(x-2)$")
+    for tau, ls in ((0.5, "--"), (0.1, "-")):
+        hh = np.linspace(tau / 3.3, 4.6 - c, 300)
+        ax.plot(c + hh, tau / hh, color=ORANGE, lw=1.6, ls=ls, label=f"$\\mu h={tau}$")
+        ax.plot(*wall_rows[c, tau], "o", color=ORANGE, ms=7, zorder=6)
+    ax.plot(*answer, "*", color=INK, ms=15, zorder=7)
+    ax.plot(*wrong, "x", color=RED, ms=11, mew=2.5, zorder=7)
+    ax.text(tx, ty, wrong_txt, color=RED, fontsize=11, ha=ha)
+    ax.set(xlim=(0.3, 4.6), ylim=(-2.6, 3.3), xlabel="$x$", title=title)
+axes[0].text(2.85, 2.25, "ответ", fontsize=11, ha="right")
+axes[1].text(2.0, -0.45, "ответ", fontsize=11, ha="center")
+axes[0].set_ylabel("$\\mu$")
+axes[0].legend(loc="lower right", fontsize=9)
+save("03_complementarity.png", min_width=800)
 
 print("готово")
