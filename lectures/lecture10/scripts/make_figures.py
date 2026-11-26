@@ -9,9 +9,10 @@
 Картинки в порядке появления в конспекте:
   00_park              введение, задача 1: круглый парк и два дома — внутри и снаружи
   00_portfolio         введение, задача 2: портфель лекции 8 при доходности 12 % — доля актива 1 отрицательна
-  01_park_cases        §2.1: два случая — дом внутри (mu = 0) и дом снаружи (h = 0, -grad f и grad h на одной прямой)
-  02_portfolio_weights §3.2: доли портфеля от доходности — без запрета (пунктир) и с запретом x >= 0
-  03_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «парк»
+  01_wall_sign         §1: знак множителя у стенки — завод лекции 3, контракт x >= 3 (mu = 2) и x >= 1 (у стенки mu = -2)
+  02_park_cases        §2.1: два случая — дом внутри (mu = 0) и дом снаружи (h = 0, -grad f и grad h на одной прямой)
+  03_portfolio_weights §3.2: доли портфеля от доходности — без запрета (пунктир) и с запретом x >= 0
+  04_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «парк»
 """
 
 from itertools import combinations
@@ -221,7 +222,35 @@ ax.axhline(0, color=INK, lw=0.8)
 ax.set(ylabel="доля капитала", ylim=(-0.32, 0.62), title="Портфель лекции 8 при доходности 12 %")
 save("00_portfolio.png")
 
-# ---------------------------------------------------------------- 01_park_cases
+# ---------------------------------------------------------------- 01_wall_sign
+# завод лекции 3: f(x) = (x - 2)^2, контракт h(x) = x - c >= 0; у стенки x = c условие f'(c) = mu * h'(c), h' = 1
+fp = lambda x: 2 * (x - 2)
+assert fp(3) == 2 and fp(1) == -2                     # контракт x >= 3: mu = 2; контракт x >= 1, точка у стенки: mu = -2
+fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.9))
+xx = np.linspace(0, 4.4, 200)
+for ax, c, title in ((axes[0], 3, "Контракт $x\\geq 3$: $\\mu=2$"), (axes[1], 1, "Контракт $x\\geq 1$: у стенки $\\mu=-2$")):
+    ax.axvspan(c, 4.4, color=AQUA, alpha=0.15)                       # допустимая область h >= 0
+    ax.axvline(c, color=AQUA, lw=3)                                 # стенка h = 0
+    ax.plot(xx, (xx - 2) ** 2, color=GRAY, lw=2)
+    ax.plot(c, (c - 2) ** 2, "o", color=INK, ms=7, zorder=7)
+    ax.text(c + 0.08, 3.6, "допустимо", color=AQUA, fontsize=11)
+    ax.set(xlim=(0, 4.4), ylim=(-0.9, 4.2), xlabel="$x$", title=title)
+y0 = -0.45
+arrow(axes[0], (3, y0), (2.2, y0), ORANGE)                          # -f'(3) = -2: f уменьшается влево, за стенку
+arrow(axes[0], (3, y0 + 0.5), (3.8, y0 + 0.5), BLUE)                # mu h' = 2: стенка толкает внутрь
+axes[0].text(2.15, y0 - 0.05, "$-f'=-2$", color=ORANGE, ha="right", va="center", fontsize=12)
+axes[0].text(3.85, y0 + 0.5, "$\\mu h'=2$", color=BLUE, va="center", fontsize=12)
+axes[0].set_ylabel("$f(x)=(x-2)^2$")
+arrow(axes[1], (1, y0), (1.8, y0), ORANGE)                          # -f'(1) = 2: f уменьшается вправо, внутрь
+axes[1].add_patch(FancyArrowPatch((1, y0 + 0.5), (0.2, y0 + 0.5), arrowstyle="-|>", mutation_scale=16,
+                                  color=BLUE, lw=2.2, ls="--", zorder=6))   # mu h' = -2: стенке пришлось бы тянуть
+axes[1].text(1.85, y0, "$-f'=2$", color=ORANGE, va="center", fontsize=12)
+axes[1].text(0.15, y0 + 0.85, "$\\mu h'=-2$", color=BLUE, fontsize=12)
+axes[1].plot(2, 0, "*", color=INK, ms=13, zorder=7)
+axes[1].text(2.1, 0.25, "минимум $x^\\ast=2$, $\\mu=0$", fontsize=11)
+save("01_wall_sign.png", min_width=800)
+
+# ---------------------------------------------------------------- 02_park_cases
 fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.4))
 t = np.linspace(0, 2 * np.pi, 200)
 for ax, a, title in ((axes[0], HOUSE_IN, "Дом внутри: $\\mu=0$"), (axes[1], HOUSE_OUT, "Дом снаружи: $h=0$")):
@@ -241,9 +270,9 @@ arrow(axes[1], xs_, xs_ - 0.55 * xs_ / np.linalg.norm(xs_), BLUE)               
 axes[1].text(1.05, 0.05, "$-\\nabla f$", color=ORANGE, fontsize=13)
 axes[1].text(0.12, 0.42, "$\\nabla h$", color=BLUE, fontsize=13)
 axes[1].text(0.9, -0.85, "$\\nabla f=0.618\\,\\nabla h$", fontsize=12, ha="center")
-save("01_park_cases.png", min_width=800)
+save("02_park_cases.png", min_width=800)
 
-# ---------------------------------------------------------------- 02_portfolio_weights
+# ---------------------------------------------------------------- 03_portfolio_weights
 rhos = np.linspace(0.06, 0.145, 120)
 w_free = np.array([portfolio_active(r, [])[0] for r in rhos])
 w_box = np.array([portfolio_bounded(r)[1] for r in rhos])
@@ -261,9 +290,9 @@ ax.plot([], [], "-", color=GRAY, lw=2.4, label="с $x\\geq 0$")
 ax.set(xlabel="требуемая доходность $\\rho$, %", ylabel="доля капитала", ylim=(-0.75, 1.0),
        title="Доли портфеля от доходности")
 ax.legend(loc="lower left", ncol=3)
-save("02_portfolio_weights.png", min_width=800)
+save("03_portfolio_weights.png", min_width=800)
 
-# ---------------------------------------------------------------- 03_complementarity
+# ---------------------------------------------------------------- 04_complementarity
 fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.2))
 ax = axes[0]
 ax.plot([0, 1.1], [0, 0], color=INK, lw=3.5)
@@ -288,6 +317,6 @@ ax.plot(*x_out, "o", color=INK, ms=6, zorder=6)
 ax.text(x_out[0] + 0.08, x_out[1] + 0.02, "$x^\\ast$", fontsize=13)
 ax.set(xlim=(-0.4, 2.3), ylim=(-0.5, 1.4), xlabel="$x_1$", ylabel="$x_2$", title="Задача «парк»: точки при $\\mu h=\\tau$")
 ax.set_aspect("equal")
-save("03_complementarity.png", min_width=800)
+save("04_complementarity.png", min_width=800)
 
 print("готово")
