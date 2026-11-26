@@ -156,6 +156,10 @@ assert A12 == (0,) and np.allclose(xb12, x1_12)
 x10 = portfolio_active(0.10, [])[0]
 assert np.allclose(x10, [0.0946, 0.3822, 0.3209, 0.2023], atol=5e-5)                 # лекция 8, семинар
 risk0, risk1 = 0.5 * x0_12 @ PF_SIGMA @ x0_12, 0.5 * x1_12 @ PF_SIGMA @ x1_12
+assert np.allclose(PF_SIGMA, [[0.0025, 0.0012, 0.0009, 0], [0.0012, 0.0144, 0.0108, 0.0108],
+                             [0.0009, 0.0108, 0.0324, 0.0216], [0, 0.0108, 0.0216, 0.09]])   # матрица во введении
+assert abs(np.sqrt(2 * risk0) - 0.169) < 5e-4 and abs(np.sqrt(2 * risk1) - 0.174) < 5e-4      # СКО портфеля 16.9 % и 17.4 %
+assert abs(-0.2 * 4 + 0.5 * 8 + 0.43 * 11 + 0.27 * 15 - 12) < 0.05                           # проверка «≈ 12 %» во введении
 assert abs(risk0 - 0.01429) < 5e-6 and abs(risk1 - 0.01512) < 5e-6
 rho_two = brentq(lambda r: portfolio_active(r, [0])[0][1], 0.121, 0.135)            # когда обнуляется и x2
 assert abs(rho_two - 0.1269) < 5e-5
