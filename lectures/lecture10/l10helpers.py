@@ -1,9 +1,10 @@
 """Вспомогательный код демонстраций лекции 10.
 
-Задача «парк»: HOUSE_OUT = (2, 1), HOUSE_IN = (0.5, 0.3); park_solution(a) -> (x*, mu*); park_tau(a, tau) -> (x, mu) при mu*h = tau.
+Задача «такси»: TAXI_T, TAXI_Y, TAXI_A; taxi_f(x), taxi_grad(x); taxi_guess(A) -> (x, mu) при ограничениях из A как равенствах;
+        taxi_tau(tau) -> (x, mu) при mu_i*h_i = tau. Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).
 Портфель: PF_R, PF_SIGMA; portfolio_active(rho, A) -> (x, lam1, lam_rho, mu) при x_i = 0 для i из A;
         portfolio_bounded(rho) -> (A, x, lam1, lam_rho, mu) с x >= 0 перебором активных множеств.
-Рисовалка: draw_park(ax). Нужен CasADi (--group casadi).
+Рисовалка: draw_quadrant(ax). Нужен CasADi (--group casadi).
 
 Файл генерируется скриптом scripts/build_lecture10.py из scripts/build_demo10.py — не правьте руками.
 """
@@ -17,7 +18,6 @@ from itertools import combinations
 import casadi as ca
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
 from scipy.optimize import brentq
 
 BLUE, ORANGE, AQUA, YELLOW, RED, VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e34948", "#4a3aa7"
@@ -27,11 +27,45 @@ plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.r
 
 
 # ---------------------------------------------------------------- методы (те же, что в demo10 / l10helpers.py)
-# задача «парк»
-HOUSE_OUT = np.array([2.0, 1.0])       # дом снаружи парка
-HOUSE_IN = np.array([0.5, 0.3])        # дом внутри парка
+# задача «такси»: цена поездки y ~ a t + b, a >= 0, b >= 0 (t — км, y — сотни рублей)
+TAXI_T = np.array([1.0, 2.0, 3.0, 4.0])
+TAXI_Y = np.array([0.6, 1.7, 3.0, 4.1])
+TAXI_A = np.column_stack([TAXI_T, np.ones(4)])          # матрица МНК: строка (t_i, 1)
 
 
+def taxi_f(x):
+    """Половина суммы квадратов отклонений модели a t + b от данных; x = (a, b)."""
+    return 0.5 * np.sum((TAXI_A @ x - TAXI_Y) ** 2)
+
+
+def taxi_grad(x):
+    """grad f = A^T A x - A^T y = (30a + 10b - 29.4, 10a + 4b - 9.4)."""
+    return TAXI_A.T @ (TAXI_A @ x - TAXI_Y)
+
+
+def taxi_guess(active):
+    """Догадка: ограничения из active (0 — a >= 0, 1 — b >= 0) — равенства, остальные выброшены.
+    Возвращает (x, mu): x решает систему, mu = grad f(x) (градиенты ограничений — e_1 и e_2)."""
+    G, c = TAXI_A.T @ TAXI_A, TAXI_A.T @ TAXI_Y
+    free = [i for i in range(2) if i not in active]
+    x = np.zeros(2)
+    if free:
+        x[free] = np.linalg.solve(G[np.ix_(free, free)], c[free])
+    return x, taxi_grad(x)
+
+
+def taxi_tau(tau):
+    """Точка, где вместо mu_i h_i = 0 стоит mu_i h_i = tau: grad f = (mu_a, mu_b), mu_a a = mu_b b = tau, a, b > 0.
+    Из второй строки b(a) — положительный корень 4b^2 + (10a - 9.4) b - tau = 0; a — корень первой строки."""
+    def b_of(a):
+        q = 10 * a - 9.4
+        return (-q + np.sqrt(q * q + 16 * tau)) / 8
+    a = brentq(lambda a: 30 * a + 10 * b_of(a) - 29.4 - tau / a, 1e-9, 5)
+    x = np.array([a, b_of(a)])
+    return x, tau / x
+
+
+# ближайшая точка круга — упражнение 10.1
 def park_solution(a):
     """min 1/2 |x - a|^2 при h(x) = 1 - |x|^2 >= 0. Возвращает (x*, mu*).
     Внутри (|a| <= 1): x* = a, mu = 0. Снаружи: x* = a/|a|, mu = (|a| - 1)/2 — из x - a = -2 mu x."""
@@ -40,16 +74,6 @@ def park_solution(a):
     if na <= 1:
         return a.copy(), 0.0
     return a / na, (na - 1) / 2
-
-
-def park_tau(a, tau):
-    """Точка, где вместо mu*h = 0 стоит mu*h = tau: x = a/(1 + 2 mu), mu*(1 - |x|^2) = tau.
-    Ветвь mu > 0, h > 0: при mu > (|a| - 1)/2 точка x внутри парка, поэтому корень ищется правее этого числа."""
-    a = np.asarray(a, float)
-    na = np.linalg.norm(a)
-    phi = lambda mu: mu * (1 - na**2 / (1 + 2 * mu) ** 2) - tau
-    mu = brentq(phi, max((na - 1) / 2, 0) + 1e-12, 1e3)
-    return a / (1 + 2 * mu), mu
 
 
 # портфель (данные лекций 3 и 8)
@@ -87,7 +111,8 @@ def portfolio_bounded(rho):
     return found[0]
 
 
-def draw_park(ax):
-    """Парк — круг радиуса 1 с центром в начале координат."""
-    ax.add_patch(Circle((0, 0), 1, facecolor=AQUA, alpha=0.18, edgecolor=AQUA, lw=2))
-    ax.set_aspect("equal")
+def draw_quadrant(ax, a_max=1.6, b_max=2.6):
+    """Допустимая область задачи «такси»: четверть a >= 0, b >= 0."""
+    ax.fill_between([0, a_max], 0, b_max, color=AQUA, alpha=0.15)
+    ax.axhline(0, color=AQUA, lw=2)
+    ax.axvline(0, color=AQUA, lw=2)

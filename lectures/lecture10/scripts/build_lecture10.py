@@ -7,9 +7,9 @@
 Ячейки демонстраций берутся из build_demo10.py (тот же код, что в demo10.ipynb) и собраны в конце,
 в разделе «## Демо», после вопросов для самопроверки:
 
-    (a) условия ККТ в задаче «парк»                        -> к разделу 2
+    (a) условия ККТ в задаче «такси»                       -> к разделу 2
     (b) активное множество: портфель руками, сверка с IPOPT -> к разделу 3
-    (c) точки задачи «парк» при mu*h = tau                  -> к разделу 4
+    (c) точки задачи «такси» при mu_i*h_i = tau             -> к разделу 4
 
 Часть (e) остаётся только в demo10.ipynb. Заголовки частей «## (a) …» становятся
 «### Демо (a). …», чтобы не ломать нумерацию разделов конспекта. Вторая ячейка demo10
@@ -41,7 +41,7 @@ def demo_parts() -> tuple[nbf.NotebookNode, dict[str, list[nbf.NotebookNode]]]:
     """Возвращает ячейку с импортами и словарь часть -> её ячейки (без шпаргалки)."""
     cells = build_demo10.cells
     assert cells[0].cell_type == "markdown" and cells[0].source.startswith("# Демонстрации")
-    assert cells[1].cell_type == "code" and "def park_solution(" in cells[1].source
+    assert cells[1].cell_type == "code" and "def taxi_guess(" in cells[1].source
     parts: dict[str, list[nbf.NotebookNode]] = {}
     current = None
     for cell in cells[2:]:
@@ -68,10 +68,11 @@ def main() -> None:
     helper_body = setup.source.replace("%matplotlib inline\n\n", "", 1)
     (LECTURE / "l10helpers.py").write_text(
         '"""Вспомогательный код демонстраций лекции 10.\n\n'
-        'Задача «парк»: HOUSE_OUT = (2, 1), HOUSE_IN = (0.5, 0.3); park_solution(a) -> (x*, mu*); park_tau(a, tau) -> (x, mu) при mu*h = tau.\n'
+        'Задача «такси»: TAXI_T, TAXI_Y, TAXI_A; taxi_f(x), taxi_grad(x); taxi_guess(A) -> (x, mu) при ограничениях из A как равенствах;\n'
+        '        taxi_tau(tau) -> (x, mu) при mu_i*h_i = tau. Ближайшая точка круга (упражнение 10.1): park_solution(a) -> (x*, mu*).\n'
         'Портфель: PF_R, PF_SIGMA; portfolio_active(rho, A) -> (x, lam1, lam_rho, mu) при x_i = 0 для i из A;\n'
         '        portfolio_bounded(rho) -> (A, x, lam1, lam_rho, mu) с x >= 0 перебором активных множеств.\n'
-        'Рисовалка: draw_park(ax). Нужен CasADi (--group casadi).\n\n'
+        'Рисовалка: draw_quadrant(ax). Нужен CasADi (--group casadi).\n\n'
         'Файл генерируется скриптом scripts/build_lecture10.py из scripts/build_demo10.py — не правьте руками.\n"""\n\n'
         + helper_body + "\n",
         encoding="utf-8",
@@ -82,7 +83,7 @@ def main() -> None:
         if i == 1:  # после шапки конспекта — где код
             out.append(nbf.v4.new_markdown_cell(
                 "> **Код в этом ноутбуке.** Текст лекции идёт подряд, без кода. Три демо из [`demo10.ipynb`](demo10.ipynb) "
-                "собраны в конце, в разделе «Демо»: (a) к §2 — условия ККТ в задаче «парк», (b) к §3 — портфель руками и IPOPT, "
+                "собраны в конце, в разделе «Демо»: (a) к §2 — условия ККТ в задаче «такси», (b) к §3 — портфель руками и IPOPT, "
                 "(c) к §4 — точки при $\\mu h=\\tau$. Подробности — только в `demo10.ipynb`. "
                 "Нужен CasADi: `uv run --group casadi jupyter lab`, в Colab он ставится сам."
             ))
@@ -91,10 +92,10 @@ def main() -> None:
     # все демо — в конце, после вопросов для самопроверки
     out.append(nbf.v4.new_markdown_cell(
         "## Демо\n\nТри демо к разделам лекции: (a) к §2, (b) к §3, (c) к §4. "
-        "Ячейка ниже подключает вспомогательный код из [`l10helpers.py`](l10helpers.py): палитру и задачи «парк» и «портфель»."
+        "Ячейка ниже подключает вспомогательный код из [`l10helpers.py`](l10helpers.py): палитру и задачи «такси» и «портфель»."
     ))
     out.append(nbf.v4.new_code_cell(
-        "%matplotlib inline\n\nfrom l10helpers import *  # палитра, задачи «парк» и «портфель» (см. файл рядом)"
+        "%matplotlib inline\n\nfrom l10helpers import *  # палитра, задачи «такси» и «портфель» (см. файл рядом)"
     ))
     for part in DEMOS:
         out.extend(nbf.v4.new_code_cell(c.source) if c.cell_type == "code"

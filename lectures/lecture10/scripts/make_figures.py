@@ -2,17 +2,17 @@
 
 Запуск:  uv run --group casadi python lectures/lecture10/scripts/make_figures.py
 
-Скрипт самодостаточен: задача «парк», портфель с запретом коротких продаж и путь при mu*h = tau определены здесь
+Скрипт самодостаточен: задача «такси», портфель с запретом коротких продаж и путь при mu*h = tau определены здесь
 тем же кодом, что в build_demo10.py / l10helpers.py; числа конспекта считаются в скрипте и проверяются ассертами.
 Сверка портфеля с IPOPT — через CasADi.
 
 Картинки в порядке появления в конспекте:
-  00_park              введение, задача 1: круглый парк и два дома — внутри и снаружи
+  00_taxi              введение, задача 1: четыре поездки и прямая без ограничений — плата за посадку b = -0.60
   00_portfolio         введение, задача 2: портфель лекции 8 при доходности 12 % — доля актива 1 отрицательна
   01_wall_sign         §1: знак множителя у стенки — завод лекции 3, контракт x >= 3 (mu = 2) и x >= 1 (у стенки mu = -2)
-  02_park_cases        §2.1: два случая — дом внутри (mu = 0) и дом снаружи (h = 0, -grad f и grad h на одной прямой)
+  02_taxi_guesses      §2.1: плоскость (a, b), линии уровня f и четыре догадки; «обрезка» — не ответ
   03_portfolio_weights §3.2: доли портфеля от доходности — без запрета (пунктир) и с запретом x >= 0
-  04_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «парк»
+  04_complementarity   §4: условие mu*h = 0 — «уголок»; mu*h = tau — гипербола; путь точки в задаче «такси»
 """
 
 from itertools import combinations
@@ -24,7 +24,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Circle, FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch
 from PIL import Image
 from scipy.optimize import brentq
 
@@ -62,11 +62,45 @@ def arrow(ax, p, q, color, lw=2.2, ms=16):
 
 
 # ---------------------------------------------------------------- методы (те же, что в demo10 / l10helpers.py)
-# задача «парк»
-HOUSE_OUT = np.array([2.0, 1.0])       # дом снаружи парка
-HOUSE_IN = np.array([0.5, 0.3])        # дом внутри парка
+# задача «такси»: цена поездки y ~ a t + b, a >= 0, b >= 0 (t — км, y — сотни рублей)
+TAXI_T = np.array([1.0, 2.0, 3.0, 4.0])
+TAXI_Y = np.array([0.6, 1.7, 3.0, 4.1])
+TAXI_A = np.column_stack([TAXI_T, np.ones(4)])          # матрица МНК: строка (t_i, 1)
 
 
+def taxi_f(x):
+    """Половина суммы квадратов отклонений модели a t + b от данных; x = (a, b)."""
+    return 0.5 * np.sum((TAXI_A @ x - TAXI_Y) ** 2)
+
+
+def taxi_grad(x):
+    """grad f = A^T A x - A^T y = (30a + 10b - 29.4, 10a + 4b - 9.4)."""
+    return TAXI_A.T @ (TAXI_A @ x - TAXI_Y)
+
+
+def taxi_guess(active):
+    """Догадка: ограничения из active (0 — a >= 0, 1 — b >= 0) — равенства, остальные выброшены.
+    Возвращает (x, mu): x решает систему, mu = grad f(x) (градиенты ограничений — e_1 и e_2)."""
+    G, c = TAXI_A.T @ TAXI_A, TAXI_A.T @ TAXI_Y
+    free = [i for i in range(2) if i not in active]
+    x = np.zeros(2)
+    if free:
+        x[free] = np.linalg.solve(G[np.ix_(free, free)], c[free])
+    return x, taxi_grad(x)
+
+
+def taxi_tau(tau):
+    """Точка, где вместо mu_i h_i = 0 стоит mu_i h_i = tau: grad f = (mu_a, mu_b), mu_a a = mu_b b = tau, a, b > 0.
+    Из второй строки b(a) — положительный корень 4b^2 + (10a - 9.4) b - tau = 0; a — корень первой строки."""
+    def b_of(a):
+        q = 10 * a - 9.4
+        return (-q + np.sqrt(q * q + 16 * tau)) / 8
+    a = brentq(lambda a: 30 * a + 10 * b_of(a) - 29.4 - tau / a, 1e-9, 5)
+    x = np.array([a, b_of(a)])
+    return x, tau / x
+
+
+# ближайшая точка круга — упражнение 10.1
 def park_solution(a):
     """min 1/2 |x - a|^2 при h(x) = 1 - |x|^2 >= 0. Возвращает (x*, mu*).
     Внутри (|a| <= 1): x* = a, mu = 0. Снаружи: x* = a/|a|, mu = (|a| - 1)/2 — из x - a = -2 mu x."""
@@ -75,16 +109,6 @@ def park_solution(a):
     if na <= 1:
         return a.copy(), 0.0
     return a / na, (na - 1) / 2
-
-
-def park_tau(a, tau):
-    """Точка, где вместо mu*h = 0 стоит mu*h = tau: x = a/(1 + 2 mu), mu*(1 - |x|^2) = tau.
-    Ветвь mu > 0, h > 0: при mu > (|a| - 1)/2 точка x внутри парка, поэтому корень ищется правее этого числа."""
-    a = np.asarray(a, float)
-    na = np.linalg.norm(a)
-    phi = lambda mu: mu * (1 - na**2 / (1 + 2 * mu) ** 2) - tau
-    mu = brentq(phi, max((na - 1) / 2, 0) + 1e-12, 1e3)
-    return a / (1 + 2 * mu), mu
 
 
 # портфель (данные лекций 3 и 8)
@@ -125,24 +149,38 @@ def portfolio_bounded(rho):
 # ---------------------------------------------------------------- числа конспекта
 print("числа лекции 10:")
 
-# ---- задача «парк»
-x_out, mu_out = park_solution(HOUSE_OUT)
-x_in, mu_in = park_solution(HOUSE_IN)
-assert np.allclose(x_out, [0.894, 0.447], atol=5e-4) and abs(mu_out - 0.618) < 5e-4
-assert np.allclose(x_in, HOUSE_IN) and mu_in == 0 and abs(1 - x_in @ x_in - 0.66) < 1e-12
-assert np.allclose(x_out - HOUSE_OUT + 2 * mu_out * x_out, 0)                # стационарность снаружи
-x_far, mu_far = -x_out, -(np.linalg.norm(HOUSE_OUT) + 1) / 2                   # второе решение системы на границе
-assert np.allclose(x_far - HOUSE_OUT + 2 * mu_far * x_far, 0) and abs(mu_far + 1.618) < 5e-4   # самая дальняя точка, mu < 0
-print(f"   парк: снаружи x* = {x_out.round(3)}, mu = {mu_out:.3f}; внутри x* = a, mu = 0, h = {1 - x_in @ x_in:.2f}")
+# ---- задача «такси»
+G_taxi, c_taxi = TAXI_A.T @ TAXI_A, TAXI_A.T @ TAXI_Y
+assert np.allclose(G_taxi, [[30, 10], [10, 4]]) and np.allclose(c_taxi, [29.4, 9.4])      # суммы во введении
+guess = {A: taxi_guess(A) for A in ((), (0, 1), (0,), (1,))}
+x_free, _ = guess[()]
+assert np.allclose(x_free, [1.18, -0.60])                                                  # без ограничений: b < 0
+assert np.allclose(guess[(0, 1)][1], [-29.4, -9.4])                                        # оба как равенства: mu < 0
+assert np.allclose(guess[(0,)][0], [0, 2.35]) and np.allclose(guess[(0,)][1], [-5.9, 0])    # только a = 0: mu_1 < 0
+x_taxi, mu_taxi = guess[(1,)]
+assert np.allclose(x_taxi, [0.98, 0]) and np.allclose(mu_taxi, [0, 0.4])                  # только b = 0: ответ
+x_clip = np.array([x_free[0], 0.0])
+assert np.allclose(taxi_grad(x_clip), [6, 2.4])                                            # «обрезка»: стационарность нарушена
+assert abs(taxi_f(x_clip) - 0.724) < 5e-4 and abs(taxi_f(x_taxi) - 0.124) < 5e-4 and abs(taxi_f(x_free) - 0.004) < 5e-4
+print(f"   такси: без ограничений {x_free.round(2)}, ответ {x_taxi.round(2)}, mu = {mu_taxi.round(2)}; "
+      f"f: обрезка {taxi_f(x_clip):.3f}, ответ {taxi_f(x_taxi):.3f}")
 
 tau_rows = {}
 for tau in (1.0, 0.1, 0.01, 0.001):
-    x_t, mu_t = park_tau(HOUSE_OUT, tau)
-    tau_rows[tau] = (x_t, mu_t, 1 - x_t @ x_t, np.linalg.norm(x_t - x_out))
-x_t, mu_t, h_t, d_t = tau_rows[0.01]
-assert np.allclose(x_t, [0.887, 0.444], atol=5e-4) and abs(mu_t - 0.627) < 5e-4 and abs(h_t - 0.016) < 5e-4
-assert abs(d_t - 0.008) < 5e-4 and abs(tau_rows[0.1][3] - 0.0735) < 1e-4 and abs(tau_rows[0.001][3] - 0.0008) < 5e-5
-print("   путь mu*h = tau:", ", ".join(f"tau={t}: x=({r[0][0]:.3f}, {r[0][1]:.3f}), до x* {r[3]:.4f}" for t, r in tau_rows.items()))
+    x_t, mu_t = taxi_tau(tau)
+    assert x_t.min() > 0 and np.allclose(taxi_grad(x_t), mu_t) and np.allclose(mu_t * x_t, tau)
+    tau_rows[tau] = (x_t, mu_t, np.linalg.norm(x_t - x_taxi))
+assert np.allclose(tau_rows[0.1][0], [0.924, 0.180], atol=5e-4) and abs(tau_rows[0.1][2] - 0.19) < 5e-3
+assert abs(tau_rows[0.01][2] - 0.025) < 5e-4 and abs(tau_rows[0.001][2] - 0.0026) < 5e-5
+print("   путь mu*h = tau:", ", ".join(f"tau={t}: x=({r[0][0]:.3f}, {r[0][1]:.3f}), до ответа {r[2]:.4f}" for t, r in tau_rows.items()))
+
+# ---- ближайшая точка круга (упражнение 10.1)
+assert np.allclose(park_solution((2, 1))[0], [0.894, 0.447], atol=5e-4) and abs(park_solution((2, 1))[1] - 0.618) < 5e-4
+assert park_solution((0.5, 0.3))[1] == 0
+x_c, mu_c = park_solution((0, 3))
+assert np.allclose(x_c, [0, 1]) and mu_c == 1
+x_c, mu_c = park_solution((0.6, 0.8))
+assert np.allclose(x_c, [0.6, 0.8]) and mu_c == 0 and abs(1 - x_c @ x_c) < 1e-12              # на границе: h = 0 и mu = 0
 
 # ---- портфель
 x0_12, l1_0, lr_0, _ = portfolio_active(0.12, [])
@@ -200,16 +238,18 @@ print("   семинар: С1 mu = 0 и 2; С2 x* = (0, 2), mu = (1, 0); С3 в 
 
 print("картинки:")
 
-# ---------------------------------------------------------------- 00_park
-fig, ax = plt.subplots(figsize=(6.4, 4.6))
-ax.add_patch(Circle((0, 0), 1, facecolor=AQUA, alpha=0.18, edgecolor=AQUA, lw=2))
-ax.text(-0.55, -0.55, "парк\n$h(x)=1-\\Vert x\\Vert^2\\geq 0$", color=INK, fontsize=11, ha="center")
-for a, label, dy in ((HOUSE_OUT, "дом снаружи\n$a=(2,\\ 1)$", 0.2), (HOUSE_IN, "дом внутри\n$a=(0.5,\\ 0.3)$", 0.18)):
-    ax.plot(*a, "s", color=ORANGE, ms=11, zorder=5)
-    ax.text(a[0], a[1] + dy, label, ha="center", va="bottom", fontsize=11)
-ax.set(xlim=(-1.4, 2.8), ylim=(-1.25, 1.9), xlabel="$x_1$", ylabel="$x_2$", title="Ближайшая к дому точка парка")
-ax.set_aspect("equal")
-save("00_park.png")
+# ---------------------------------------------------------------- 00_taxi
+fig, ax = plt.subplots(figsize=(6.4, 4.2))
+tt = np.linspace(0, 4.4, 50)
+ax.axhline(0, color=INK, lw=0.8)
+ax.plot(tt, x_free[0] * tt + x_free[1], color=ORANGE, lw=2, label="без ограничений: $b=-0.60$")
+ax.plot(TAXI_T, TAXI_Y, "o", color=BLUE, ms=8, zorder=5, label="четыре поездки")
+ax.plot(0, x_free[1], "o", color=ORANGE, ms=7, zorder=5)
+ax.text(0.12, x_free[1] - 0.05, "плата за посадку $-60$ руб.", color=ORANGE, fontsize=11, va="center")
+ax.set(xlim=(-0.1, 4.4), ylim=(-0.9, 4.6), xlabel="длина поездки $t$, км", ylabel="цена $y$, сотни руб.",
+       title="Цена поездки: $y\\approx at+b$")
+ax.legend(loc="upper left")
+save("00_taxi.png")
 
 # ---------------------------------------------------------------- 00_portfolio
 fig, ax = plt.subplots(figsize=(6.4, 3.8))
@@ -250,27 +290,26 @@ axes[1].plot(2, 0, "*", color=INK, ms=13, zorder=7)
 axes[1].text(2.1, 0.25, "минимум $x^\\ast=2$, $\\mu=0$", fontsize=11)
 save("01_wall_sign.png", min_width=800)
 
-# ---------------------------------------------------------------- 02_park_cases
-fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.4))
-t = np.linspace(0, 2 * np.pi, 200)
-for ax, a, title in ((axes[0], HOUSE_IN, "Дом внутри: $\\mu=0$"), (axes[1], HOUSE_OUT, "Дом снаружи: $h=0$")):
-    xs_, mu_ = park_solution(a)
-    ax.add_patch(Circle((0, 0), 1, facecolor=AQUA, alpha=0.18, edgecolor=AQUA, lw=2))
-    for rr in (0.4, 0.8, 1.236, 1.7):                                  # линии уровня f — окружности вокруг дома
-        ax.plot(a[0] + rr * np.cos(t), a[1] + rr * np.sin(t), color=GRAY, lw=0.8, alpha=0.7)
-    ax.plot(*a, "s", color=ORANGE, ms=10, zorder=5)
-    ax.plot(*xs_, "o", color=INK, ms=7, zorder=7)
-    ax.set(xlim=(-1.3, 2.6), ylim=(-1.3, 1.8), xlabel="$x_1$", title=title)
-    ax.set_aspect("equal")
-axes[0].set_ylabel("$x_2$")
-axes[0].text(HOUSE_IN[0], -0.95, "$x^\\ast=a$, $h=0.66$", ha="center", fontsize=12)
-xs_ = x_out
-arrow(axes[1], xs_, xs_ + 0.55 * (HOUSE_OUT - xs_) / np.linalg.norm(HOUSE_OUT - xs_), ORANGE)       # -grad f: к дому
-arrow(axes[1], xs_, xs_ - 0.55 * xs_ / np.linalg.norm(xs_), BLUE)                                  # grad h = -2x: внутрь
-axes[1].text(1.05, 0.05, "$-\\nabla f$", color=ORANGE, fontsize=13)
-axes[1].text(0.12, 0.42, "$\\nabla h$", color=BLUE, fontsize=13)
-axes[1].text(0.9, -0.85, "$\\nabla f=0.618\\,\\nabla h$", fontsize=12, ha="center")
-save("02_park_cases.png", min_width=800)
+# ---------------------------------------------------------------- 02_taxi_guesses
+fig, ax = plt.subplots(figsize=(7.6, 5.0))
+aa, bb = np.meshgrid(np.linspace(-0.3, 1.6, 300), np.linspace(-1.0, 2.6, 300))
+ff = 0.5 * sum((aa * t_ + bb - y_) ** 2 for t_, y_ in zip(TAXI_T, TAXI_Y))
+ax.contour(aa, bb, ff, levels=[0.124, 0.724, 2.0, 3.485, 8.0, 14.53], colors=GRAY, linewidths=0.9)
+ax.fill_between([0, 1.6], 0, 2.6, color=AQUA, alpha=0.15)                       # допустимо: a >= 0, b >= 0
+ax.axhline(0, color=AQUA, lw=2.5)
+ax.axvline(0, color=AQUA, lw=2.5)
+marks = [(x_free, "x", RED, "без ограничений\n$(1.18,\\ -0.60)$", (0.05, -0.28)),
+         (guess[(0, 1)][0], "s", VIOLET, "оба как равенства\n$(0,\\ 0)$, $\\mu<0$", (0.05, -0.42)),
+         (guess[(0,)][0], "s", VIOLET, "только $a=0$\n$(0,\\ 2.35)$, $\\mu_1<0$", (0.06, -0.42)),
+         (x_clip, "D", ORANGE, "«обрезка»\n$(1.18,\\ 0)$, $f=0.724$", (0.06, 0.12)),
+         (x_taxi, "*", INK, "ответ $(0.98,\\ 0)$\n$f=0.124$", (-0.62, 0.22))]
+for pt, m, col, label, (dx, dy) in marks:
+    ax.plot(*pt, m, color=col, ms=12 if m == "*" else 9, zorder=6)
+    ax.text(pt[0] + dx, pt[1] + dy, label, fontsize=10, color=col if col != INK else INK)
+ax.text(1.0, 2.25, "допустимо: $a\\geq 0$, $b\\geq 0$", color=AQUA, fontsize=11)
+ax.set(xlim=(-0.3, 1.6), ylim=(-1.0, 2.6), xlabel="цена километра $a$", ylabel="плата за посадку $b$",
+       title="Задача «такси»: четыре догадки")
+save("02_taxi_guesses.png", min_width=600)
 
 # ---------------------------------------------------------------- 03_portfolio_weights
 rhos = np.linspace(0.06, 0.145, 120)
@@ -300,23 +339,23 @@ ax.plot([0, 0], [0, 1.1], color=INK, lw=3.5, label="$\\mu h=0$, $\\mu\\geq 0$, $
 for tau, col in ((0.1, BLUE), (0.01, VIOLET)):
     hh = np.linspace(tau / 1.1, 1.1, 300)
     ax.plot(hh, tau / hh, color=col, lw=2, label=f"$\\mu h={tau}$")
-ax.plot(1 - x_in @ x_in, 0, "s", color=ORANGE, ms=9, zorder=6)
-ax.plot(0, mu_out, "o", color=ORANGE, ms=9, zorder=6)
-ax.text(1 - x_in @ x_in, 0.06, "дом внутри", ha="center", fontsize=10)
-ax.text(0.05, mu_out + 0.03, "дом снаружи", fontsize=10)
+ax.plot(x_taxi[0], 0, "s", color=ORANGE, ms=9, zorder=6)                       # a >= 0: h_1 = 0.98, mu_1 = 0
+ax.plot(0, mu_taxi[1], "o", color=ORANGE, ms=9, zorder=6)                      # b >= 0: h_2 = 0, mu_2 = 0.4
+ax.text(x_taxi[0], 0.06, "$a\\geq 0$", ha="center", fontsize=11)
+ax.text(0.05, mu_taxi[1] + 0.04, "$b\\geq 0$", fontsize=11)
 ax.set(xlim=(-0.05, 1.1), ylim=(-0.05, 1.1), xlabel="$h$", ylabel="$\\mu$", title="Уголок и гиперболы")
 ax.legend(loc="upper right", fontsize=10)
 ax = axes[1]
-ax.add_patch(Circle((0, 0), 1, facecolor=AQUA, alpha=0.18, edgecolor=AQUA, lw=2))
-ax.plot(*HOUSE_OUT, "s", color=ORANGE, ms=10)
+ax.fill_between([0, 1.3], 0, 1.0, color=AQUA, alpha=0.15)
+ax.axhline(0, color=AQUA, lw=2.5)
+ax.axvline(0, color=AQUA, lw=2.5)
 pts = np.array([tau_rows[tau][0] for tau in (1.0, 0.1, 0.01)])
 ax.plot(pts[:, 0], pts[:, 1], "o-", color=BLUE, ms=6, lw=1.2)
-for tau, p, (dx, dy, ha) in zip((1.0, 0.1, 0.01), pts, ((-0.05, 0.06, "right"), (0.04, -0.2, "left"), (-0.06, 0.1, "right"))):
+for tau, p, (dx, dy, ha) in zip((1.0, 0.1, 0.01), pts, ((-0.05, 0.03, "right"), (-0.05, 0.03, "right"), (-0.06, 0.06, "right"))):
     ax.text(p[0] + dx, p[1] + dy, f"$\\tau={tau}$", fontsize=11, ha=ha)
-ax.plot(*x_out, "o", color=INK, ms=6, zorder=6)
-ax.text(x_out[0] + 0.08, x_out[1] + 0.02, "$x^\\ast$", fontsize=13)
-ax.set(xlim=(-0.4, 2.3), ylim=(-0.5, 1.4), xlabel="$x_1$", ylabel="$x_2$", title="Задача «парк»: точки при $\\mu h=\\tau$")
-ax.set_aspect("equal")
+ax.plot(*x_taxi, "*", color=INK, ms=12, zorder=6)
+ax.text(x_taxi[0] + 0.04, x_taxi[1] + 0.05, "ответ", fontsize=11)
+ax.set(xlim=(-0.05, 1.3), ylim=(-0.08, 1.0), xlabel="$a$", ylabel="$b$", title="Задача «такси»: точки при $\\mu_ih_i=\\tau$")
 save("04_complementarity.png", min_width=800)
 
 print("готово")
