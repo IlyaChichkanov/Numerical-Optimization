@@ -43,7 +43,8 @@ def park_solution(a):
 
 
 def park_tau(a, tau):
-    """Точка, где вместо mu*h = 0 стоит mu*h = tau: x = a/(1 + 2 mu), mu*(1 - |x|^2) = tau."""
+    """Точка, где вместо mu*h = 0 стоит mu*h = tau: x = a/(1 + 2 mu), mu*(1 - |x|^2) = tau.
+    Ветвь mu > 0, h > 0: при mu > (|a| - 1)/2 точка x внутри парка, поэтому корень ищется правее этого числа."""
     a = np.asarray(a, float)
     na = np.linalg.norm(a)
     phi = lambda mu: mu * (1 - na**2 / (1 + 2 * mu) ** 2) - tau
